@@ -1568,9 +1568,7 @@ function checkCollision(p) {
 
 async function reportOnlineResult(winnerName, loserName) {
   if (onlineResultHandled) return;
-  onlineResultHandled = true;
-  running = false;
-  clearAllTimers();
+  // KORREKTUR: onlineResultHandled hier NICHT vorab auf true setzen!
 
   const diff   = Math.abs(onlineAccount.elo - (onlineOpponent?.elo || 1500));
   const change = Math.max(1, Math.min(15, Math.round(5 + diff / 100)));
@@ -1581,12 +1579,14 @@ async function reportOnlineResult(winnerName, loserName) {
         status: "done", winner: winnerName, eloChange: change
       });
     } catch(e) {
+      // Fallback, falls die Datenbankverbindung fehlschlägt
       handleOnlineResult(winnerName, change);
     }
   } else {
     handleOnlineResult(winnerName, change);
   }
 }
+
 
 // ═══════════════════════════════════════════════
 //  TOURNAMENT FINISH
