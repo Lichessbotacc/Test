@@ -294,26 +294,43 @@ const ctx    = canvas.getContext("2d");
 
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  canvas.style.width  = window.innerWidth  + "px";
-  canvas.style.height = window.innerHeight + "px";
-  canvas.width  = Math.round(window.innerWidth  * dpr);
-  canvas.height = Math.round(window.innerHeight * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-resize();
-window.addEventListener("resize", resize);
+  const screenW = window.innerWidth;
+  const screenH = window.innerHeight;
 
-function W() { return window.innerWidth;  }
-function H() { return window.innerHeight; }
+  // Berechne den Skalierungsfaktor, um das Feld perfekt einzupassen
+  scale = Math.min(screenW / V_W, screenH / V_H);
+  
+  // Berechne Offsets für die Zentrierung
+  offsetX = (screenW - V_W * scale) / 2;
+  offsetY = (screenH - V_H * scale) / 2;
+
+  canvas.style.width  = screenW + "px";
+  canvas.style.height = screenH + "px";
+  canvas.width  = Math.round(screenW * dpr);
+  canvas.height = Math.round(screenH * dpr);
+
+  // Setze Transformation zurück, wende DPR an, verschiebe und skaliere
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
+}
+
+
+const V_W = 1024; // Virtuelle Breite (iPad 4:3 Standard)
+const V_H = 768;  // Virtuelle Höhe
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
+
+function W() { return V_W; }
+function H() { return V_H; }
+
 
 // Fix: touch coords — use clientX/Y directly (CSS pixels), no DPR needed
-function getTouchPos(touch) {
+function screenToVirtual(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
-  return {
-    x: touch.clientX - rect.left,
-    y: touch.clientY - rect.top
-  };
-}
+  const x = clientX - rect.leftNo response
+
 
 // ═══════════════════════════════════════════════
 //  ROUNDRECT POLYFILL
