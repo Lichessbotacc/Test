@@ -338,7 +338,6 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 //  FIREBASE HELPERS
 // ═══════════════════════════════════════════════
 let fbReady = false;
-window.addEventListener("firebaseReady", () => { fbReady = true; });
 window.addEventListener("firebaseReady", async () => {
   fbReady = true;
 
@@ -668,7 +667,13 @@ async function tryMatchmake() {
     startBalls: startBallCount
   };
   try {
-    await dbSet("onlineMatches/" + matchId, matchData);
+    const existing = await dbGet("onlineMatches/" + matchId);
+
+if (!existing) {
+  await dbSet("onlineMatches/" + matchId, matchData);
+} else {
+  return; // Match wurde schon erstellt
+}
     await dbRemove("queue/" + onlineAccount.name);
     await dbRemove("queue/" + opp.name);
     joinMatch(matchId, opp, matchData);
@@ -777,7 +782,12 @@ function startOnlineGame(matchData) {
   document.getElementById("onlineNameOpp").textContent = oppName;
   document.getElementById("onlineHUD").style.display   = "flex";
   document.getElementById("pingDisplay").style.display = "block";
+  document.getElementById("onlineHUD").style.display   = "flex";
+  document.getElementById("pingDisplay").style.display = "block";
 
+  if (onlineIsHost) {
+    setInterval(pushBallState, 80);
+  }
   // ── Firebase listener: opponent position + result ──
   const matchUnsub = dbOn("onlineMatches/" + onlineMatchId, (data) => {
     if (!data) return;
