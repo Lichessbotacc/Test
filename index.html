@@ -4,23 +4,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DarkOnBalls</title>
-
 <script type="module">
-  import { initializeApp }    from "[gstatic.com](https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js)";
-  import { getDatabase, ref, set, get, onValue, push, remove, update, serverTimestamp, onDisconnect }
-    from "[gstatic.com](https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js)";
-  import { getAnalytics }     from "[gstatic.com](https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js)";
+
+
+import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, push, remove, update, serverTimestamp, onDisconnect }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAnalytics }     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+
 
   const firebaseConfig = {
-    apiKey:            "AIzaSyDKwJDGSxRDBf9ihi1-T70pC6UzY6kLYb4",
-    authDomain:        "darkonballs.firebaseapp.com",
-    databaseURL:       "[darkonballs-default-rtdb.europe-west1.firebasedatabase.app](https://darkonballs-default-rtdb.europe-west1.firebasedatabase.app)",
-    projectId:         "darkonballs",
-    storageBucket:     "darkonballs.firebasestorage.app",
-    messagingSenderId: "423459139682",
-    appId:             "1:423459139682:web:62847c384d1f967a78e13b",
-    measurementId:     "G-J88EX0YX4D"
-  };
+  apiKey:            "AIzaSyDKwJDGSxRDBf9ihi1-T70pC6UzY6kLYb4",
+  authDomain:        "darkonballs.firebaseapp.com",
+  databaseURL:       "https://darkonballs-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "darkonballs",
+  storageBucket:     "darkonballs.firebasestorage.app",
+  messagingSenderId: "423459139682",
+  appId:             "1:423459139682:web:62847c384d1f967a78e13b",
+  measurementId:     "G-J88EX0YX4D"
+};
+
 
   try {
     const app = initializeApp(firebaseConfig);
