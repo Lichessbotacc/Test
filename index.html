@@ -700,7 +700,11 @@ async function tryMatchmake() {
     await dbRemove("queue/" + onlineAccount.name);
     await dbRemove("queue/" + opp.name);
     
-    joinMatchNo response
+ joinMatch(matchId, opp, matchData);
+  } catch(e) {
+    console.warn("No response or match creation race:", e);
+  }
+}
 
 
 
