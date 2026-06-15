@@ -329,7 +329,10 @@ function H() { return V_H; }
 // Fix: touch coords — use clientX/Y directly (CSS pixels), no DPR needed
 function screenToVirtual(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
-  const x = clientX - rect.leftNo response
+  return {
+    x: (clientX - rect.left - offsetX) / scale,
+    y: (clientY - rect.top - offsetY) / scale
+  };
 }
 
 // ═══════════════════════════════════════════════
