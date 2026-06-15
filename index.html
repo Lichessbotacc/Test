@@ -2,18 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>DarkOnBalls</title>
 <script type="module">
-
-
 import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, push, remove, update, serverTimestamp, onDisconnect }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import { getAnalytics }     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 
-
-  const firebaseConfig = {
+const firebaseConfig = {
   apiKey:            "AIzaSyDKwJDGSxRDBf9ihi1-T70pC6UzY6kLYb4",
   authDomain:        "darkonballs.firebaseapp.com",
   databaseURL:       "https://darkonballs-default-rtdb.europe-west1.firebasedatabase.app",
@@ -24,33 +21,32 @@ import { getAnalytics }     from "https://www.gstatic.com/firebasejs/10.12.0/fir
   measurementId:     "G-J88EX0YX4D"
 };
 
-
-  try {
-    const app = initializeApp(firebaseConfig);
-    const db  = getDatabase(app);
-    getAnalytics(app);
-    window._firebaseDB              = db;
-    window._firebaseRef             = ref;
-    window._firebaseSet             = set;
-    window._firebaseGet             = get;
-    window._firebaseOnValue         = onValue;
-    window._firebasePush            = push;
-    window._firebaseRemove          = remove;
-    window._firebaseUpdate          = update;
-    window._firebaseServerTimestamp = serverTimestamp;
-    window._firebaseOnDisconnect    = onDisconnect;
-    window._firebaseReady           = true;
-    window.dispatchEvent(new Event("firebaseReady"));
-    console.log("Firebase erfolgreich verbunden!");
-  } catch(e) {
-    console.warn("Firebase init failed – online mode disabled.", e);
-  }
+try {
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+  try { getAnalytics(app); } catch(e) {}
+  window._firebaseDB              = db;
+  window._firebaseRef             = ref;
+  window._firebaseSet             = set;
+  window._firebaseGet             = get;
+  window._firebaseOnValue         = onValue;
+  window._firebasePush            = push;
+  window._firebaseRemove          = remove;
+  window._firebaseUpdate          = update;
+  window._firebaseServerTimestamp = serverTimestamp;
+  window._firebaseOnDisconnect    = onDisconnect;
+  window._firebaseReady           = true;
+  window.dispatchEvent(new Event("firebaseReady"));
+  console.log("Firebase connected!");
+} catch(e) {
+  console.warn("Firebase init failed", e);
+}
 </script>
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{overflow:hidden;background:#111;font-family:Arial,sans-serif;}
-canvas{display:block;touch-action:none;}
+canvas{display:block;touch-action:none;-webkit-user-select:none;user-select:none;}
 
 #ui{position:absolute;top:20px;left:20px;color:white;font-size:20px;font-weight:bold;pointer-events:none;z-index:10;}
 button{padding:15px 35px;font-size:22px;border:none;border-radius:12px;cursor:pointer;margin:10px;background:#333;color:#fff;transition:background .2s;}
@@ -71,7 +67,6 @@ button:hover{background:#555;}
 #menu{display:flex;}
 h1{font-size:50px;margin-bottom:20px;}
 h2{font-size:30px;margin-bottom:20px;}
-
 #gameOver{background:rgba(0,0,0,0.85);z-index:40;}
 
 #eloResult{
@@ -141,13 +136,21 @@ input[type=text],input[type=number]{
   background:rgba(0,0,0,0.65);padding:15px 20px;border-radius:12px;
   display:none;line-height:1.6;border:1px solid rgba(255,255,255,0.15);z-index:20;
 }
-#spectatorInfo{border-color:rgba(255,165,0,0.4);}
 
 #pingDisplay{
   position:absolute;top:20px;right:210px;color:#aaa;font-size:13px;
   background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;
   display:none;z-index:20;pointer-events:none;
 }
+
+#onlineHUD{
+  position:absolute;top:20px;left:50%;transform:translateX(-50%);
+  display:none;flex-direction:column;align-items:center;
+  background:rgba(0,0,0,0.7);padding:8px 20px;border-radius:12px;
+  color:white;font-size:16px;z-index:20;pointer-events:none;
+  border:1px solid rgba(255,255,255,0.15);
+}
+.online-names{display:flex;gap:20px;font-size:20px;font-weight:bold;}
 </style>
 </head>
 <body>
@@ -263,6 +266,14 @@ input[type=text],input[type=number]{
 <canvas id="game"></canvas>
 <div id="coinHUD">🪙 <span id="coinScore">0</span> &nbsp;|&nbsp; ⏱ <span id="coinTime">60</span>s</div>
 <div id="pingDisplay">📶 -- ms</div>
+<div id="onlineHUD">
+  <div class="online-names">
+    <span id="onlineNameMe" style="color:#00ff88">Me</span>
+    <span style="color:#aaa">VS</span>
+    <span id="onlineNameOpp" style="color:#ff8844">Opp</span>
+  </div>
+  <div id="onlineStatusHUD" style="color:#aaa;font-size:13px;margin-top:4px;">Connecting…</div>
+</div>
 <div id="opponentInfo"><div id="opponentText"></div></div>
 <div id="spectatorInfo"><b>👁 Spectator Mode</b><br><div id="spectatorText"></div></div>
 
@@ -285,8 +296,8 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   canvas.style.width  = window.innerWidth  + "px";
   canvas.style.height = window.innerHeight + "px";
-  canvas.width  = window.innerWidth  * dpr;
-  canvas.height = window.innerHeight * dpr;
+  canvas.width  = Math.round(window.innerWidth  * dpr);
+  canvas.height = Math.round(window.innerHeight * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 resize();
@@ -294,6 +305,15 @@ window.addEventListener("resize", resize);
 
 function W() { return window.innerWidth;  }
 function H() { return window.innerHeight; }
+
+// Fix: touch coords — use clientX/Y directly (CSS pixels), no DPR needed
+function getTouchPos(touch) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: touch.clientX - rect.left,
+    y: touch.clientY - rect.top
+  };
+}
 
 // ═══════════════════════════════════════════════
 //  ROUNDRECT POLYFILL
@@ -371,7 +391,6 @@ function saveSettings() {
 // ═══════════════════════════════════════════════
 let balls = [], players = [], ranking = [], eliminated = [];
 let running = false, startTime = 0;
-// FIX: separate timer IDs for timeout vs interval
 let spawnTimeoutId = null, survivalIntervalId = null, coinIntervalId = null;
 let mode = "single";
 let tournamentRounds = 100, currentRound = 1;
@@ -386,13 +405,20 @@ let coins = [], coinScorePlayer = 0, coinTimeLeft = 60;
 let mirrorBot = null;
 let survivalWave = 1;
 
-// Online
+// ═══════════════════════════════════════════════
+//  ONLINE STATE — completely rewritten
+// ═══════════════════════════════════════════════
 let onlineMatchId        = null;
-let onlineRole           = null;
+let onlineRole           = null;   // "p1" or "p2"
 let onlineOpponent       = null;
 let onlineUnsubscribes   = [];
 let onlineSearchInterval = null;
 let onlineResultHandled  = false;
+let onlineIsHost         = false;  // p1 is host: controls ball physics & spawning
+
+// Balls are owned by host (p1). p2 reads ball state from Firebase.
+let onlineBallPushTimer  = 0;
+let onlinePosPushTimer   = 0;
 
 let record = parseInt(localStorage.getItem("fingerDodgeRecord") || "0");
 document.getElementById("record").textContent = record;
@@ -410,7 +436,6 @@ function exitToMenu() {
   running = false;
   clearAllTimers();
   cleanupOnline();
-  // FIX: also clear coins array
   balls = []; players = []; eliminated = []; matches = []; coins = [];
   document.getElementById("eloTable").style.display      = "none";
   document.getElementById("coinHUD").style.display       = "none";
@@ -418,10 +443,10 @@ function exitToMenu() {
   document.getElementById("spectatorInfo").style.display = "none";
   document.getElementById("winnerOverlay").style.display = "none";
   document.getElementById("pingDisplay").style.display   = "none";
+  document.getElementById("onlineHUD").style.display     = "none";
   showScreen("menu");
 }
 
-// FIX: unified timer cleanup using correct ID types
 function clearAllTimers() {
   if (spawnTimeoutId)     { clearTimeout(spawnTimeoutId);      spawnTimeoutId     = null; }
   if (survivalIntervalId) { clearInterval(survivalIntervalId); survivalIntervalId = null; }
@@ -453,13 +478,11 @@ function showEloAnimation(change) {
   const el  = document.getElementById("eloResult");
   const won = change > 0;
   el.style.animation = "none";
-  el.offsetHeight; // reflow
+  el.offsetHeight;
   el.style.color      = won ? "#00ff88" : "#ff4444";
   el.style.textShadow = `0 0 40px ${won ? "#00ff88" : "#ff4444"}`;
   el.innerHTML = (won ? "✓ +" : "✗ ") + Math.round(Math.abs(change)) + " ELO<br>"
-    + (won
-      ? '<span style="font-size:40px">WIN</span>'
-      : '<span style="font-size:40px">LOST</span>');
+    + (won ? '<span style="font-size:40px">WIN</span>' : '<span style="font-size:40px">LOST</span>');
   el.style.animation = "eloPopIn 2.5s ease forwards";
 }
 
@@ -508,7 +531,7 @@ async function createAccount() {
   const name = document.getElementById("newUsername").value.trim();
   const info = document.getElementById("accountInfo");
   if (!name || name.length < 2)           { info.textContent = "Name must be at least 2 characters."; info.style.color="#f44"; return; }
-  if (!/^[a-zA-Z0-9_-]+$/.test(name))     { info.textContent = "Only letters, numbers, _ and - allowed.";  info.style.color="#f44"; return; }
+  if (!/^[a-zA-Z0-9_-]+$/.test(name))     { info.textContent = "Only letters, numbers, _ and - allowed."; info.style.color="#f44"; return; }
   if (fbReady) {
     const existing = await dbGet("players/" + name);
     if (existing)                          { info.textContent = "Name already taken."; info.style.color="#f44"; return; }
@@ -533,7 +556,6 @@ function cancelOnline() {
 
 function cleanupOnline() {
   if (onlineSearchInterval) { clearInterval(onlineSearchInterval); onlineSearchInterval = null; }
-  // FIX: copy array before clearing to avoid iteration issues
   const unsubs = [...onlineUnsubscribes];
   onlineUnsubscribes = [];
   unsubs.forEach(fn => { try { fn(); } catch(e) {} });
@@ -548,7 +570,9 @@ function cleanupOnline() {
   onlineRole          = null;
   onlineOpponent      = null;
   onlineResultHandled = false;
-  document.getElementById("pingDisplay").style.display = "none";
+  onlineIsHost        = false;
+  document.getElementById("pingDisplay").style.display   = "none";
+  document.getElementById("onlineHUD").style.display     = "none";
 }
 
 async function cleanStaleMatches() {
@@ -558,7 +582,7 @@ async function cleanStaleMatches() {
     if (!allMatches) return;
     const now = Date.now();
     for (const [id, m] of Object.entries(allMatches)) {
-      if (m.status !== "done" && m.status !== "abandoned" && (now - m.createdAt) > 60000) {
+      if (m.status !== "done" && m.status !== "abandoned" && (now - m.createdAt) > 90000) {
         await dbRemove("onlineMatches/" + id);
       }
     }
@@ -571,58 +595,95 @@ async function startSearchingOnline() {
     return;
   }
   await cleanStaleMatches();
+  // Write ourselves to queue
   await dbSet("queue/" + onlineAccount.name, {
     name: onlineAccount.name, elo: onlineAccount.elo, ts: Date.now()
   });
+
+  // Also listen to queue so we react immediately if someone creates a match for us
+  const queueUnsub = dbOn("queue/" + onlineAccount.name + "_invite", (data) => {
+    if (data && data.matchId && !onlineMatchId) {
+      // We were invited — join the match
+      const unsub = onlineUnsubscribes.find(x => x === queueUnsub);
+      acceptInvite(data);
+    }
+  });
+  onlineUnsubscribes.push(queueUnsub);
+
   const anim = ["⏳","⌛"];
   let ai = 0;
   onlineSearchInterval = setInterval(async () => {
     document.getElementById("onlineSearchAnim").textContent = anim[ai++ % 2];
     try { await tryMatchmake(); } catch(e) { console.warn("matchmake error:", e); }
   }, 2000);
-  // Initial attempt after a short delay
-  setTimeout(() => tryMatchmake(), 500);
+  setTimeout(() => tryMatchmake(), 600);
 }
 
 async function tryMatchmake() {
   if (onlineMatchId) return;
   const queue = await dbGet("queue");
   if (!queue) return;
-  const others = Object.values(queue).filter(p => p.name !== onlineAccount.name);
+  const others = Object.values(queue).filter(p =>
+    p.name && p.name !== onlineAccount.name && p.ts && (Date.now() - p.ts < 60000)
+  );
   if (!others.length) return;
 
   others.sort((a,b) => Math.abs(a.elo - onlineAccount.elo) - Math.abs(b.elo - onlineAccount.elo));
   const opp     = others[0];
-  const matchId = [onlineAccount.name, opp.name].sort().join("__");
+  // Canonical match ID (alphabetical) so both see the same key
+  const matchId = [onlineAccount.name, opp.name].sort().join("__VS__");
 
+  // Check if match already created (by the other player)
   const existing = await dbGet("onlineMatches/" + matchId);
   if (existing && existing.status === "waiting") {
+    // Match was created by opp, we join as p2
+    if (onlineMatchId) return;
     await dbRemove("queue/" + onlineAccount.name);
-    joinMatch(matchId, opp);
+    joinMatch(matchId, opp, existing);
     return;
   }
   if (existing && existing.status !== "done" && existing.status !== "abandoned") return;
 
-  await dbSet("onlineMatches/" + matchId, {
-    p1: onlineAccount.name, p2: opp.name,
-    p1elo: onlineAccount.elo, p2elo: opp.elo,
-    status: "waiting", winner: null, createdAt: Date.now()
-  });
-  await dbRemove("queue/" + onlineAccount.name);
-  await dbRemove("queue/" + opp.name);
-  joinMatch(matchId, opp);
+  // We create the match as host (p1)
+  const p1Name = onlineAccount.name < opp.name ? onlineAccount.name : opp.name;
+  const p2Name = onlineAccount.name < opp.name ? opp.name : onlineAccount.name;
+  const isP1   = onlineAccount.name === p1Name;
+
+  const matchData = {
+    p1: p1Name, p2: p2Name,
+    p1elo: isP1 ? onlineAccount.elo : opp.elo,
+    p2elo: isP1 ? opp.elo : onlineAccount.elo,
+    status: "waiting",
+    winner: null,
+    createdAt: Date.now(),
+    // Seed for ball RNG so both clients reproduce the same balls
+    seed: Math.floor(Math.random() * 1000000),
+    ballSpeedMult: ballSpeedMultiplier,
+    startBalls: startBallCount
+  };
+  try {
+    await dbSet("onlineMatches/" + matchId, matchData);
+    await dbRemove("queue/" + onlineAccount.name);
+    await dbRemove("queue/" + opp.name);
+    joinMatch(matchId, opp, matchData);
+  } catch(e) {
+    console.warn("Match creation race:", e);
+  }
 }
 
-function joinMatch(matchId, opp) {
+function joinMatch(matchId, opp, matchData) {
   if (onlineMatchId) return;
   if (onlineSearchInterval) { clearInterval(onlineSearchInterval); onlineSearchInterval = null; }
   onlineMatchId       = matchId;
   onlineOpponent      = opp;
-  onlineRole          = (onlineAccount.name < opp.name) ? "p1" : "p2";
   onlineResultHandled = false;
 
+  const p1Name = matchData.p1;
+  onlineRole   = (onlineAccount.name === p1Name) ? "p1" : "p2";
+  onlineIsHost = (onlineRole === "p1");
+
   showVSScreen(onlineAccount.name, onlineAccount.elo, opp.name, opp.elo, () => {
-    startOnlineGame();
+    startOnlineGame(matchData);
   });
 }
 
@@ -650,72 +711,142 @@ function showVSScreen(n1, e1, n2, e2, callback) {
 }
 
 // ═══════════════════════════════════════════════
-//  ONLINE GAME
+//  SEEDED RNG (so both clients make identical balls)
 // ═══════════════════════════════════════════════
-function startOnlineGame() {
+function makeLCG(seed) {
+  let s = seed >>> 0;
+  return function() {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+// ═══════════════════════════════════════════════
+//  ONLINE GAME — fully synchronized
+// ═══════════════════════════════════════════════
+let onlineRng = null;
+let onlineBallSpawnTimer = 0;
+let onlineSpawnInterval  = 5000;
+
+function startOnlineGame(matchData) {
   hideAllScreensForGame();
   mode    = "online";
-  balls   = []; players = []; eliminated = [];
+  balls   = [];
+  players = [];
+  eliminated = [];
   running = true;
   startTime = Date.now();
   onlineResultHandled = false;
 
+  // Both clients use the same seed → identical balls
+  onlineRng           = makeLCG(matchData.seed || 42);
+  onlineSpawnInterval = (matchData.startBalls ? 5000 : spawnDelay);
+  const speedMult     = matchData.ballSpeedMult || ballSpeedMultiplier;
+  const startN        = matchData.startBalls    || startBallCount;
+
   document.getElementById("mode").textContent = "Online 1v1";
-  document.getElementById("pingDisplay").style.display = "block";
 
   const myColor  = onlineRole === "p1" ? "#00ff88" : "#ff8844";
   const oppColor = onlineRole === "p1" ? "#ff8844" : "#00ff88";
+  const myName   = onlineAccount.name;
+  const oppName  = onlineOpponent.name;
 
-  const me  = createPlayer(W() * 0.3, H() / 2, myColor,  onlineAccount.name);
-  const opp = createPlayer(W() * 0.7, H() / 2, oppColor, onlineOpponent.name);
-  players.push(me, opp);
+  // p1 always left, p2 always right — consistent for both clients
+  const p1x = W() * 0.3, p2x = W() * 0.7, py = H() / 2;
+  const meX  = onlineRole === "p1" ? p1x : p2x;
+  const oppX = onlineRole === "p1" ? p2x : p1x;
 
-  // Spawn initial balls then keep spawning
-  for (let i = 0; i < startBallCount; i++) createBall();
-  const scheduleOnlineSpawn = () => {
-    if (!running || mode !== "online") return;
-    spawnTimeoutId = setTimeout(() => {
-      if (running && mode === "online") { createBall(); scheduleOnlineSpawn(); }
-    }, 1500);
-  };
-  scheduleOnlineSpawn();
+  const mePlayer  = createPlayer(meX,  py, myColor,  myName);
+  const oppPlayer = createPlayer(oppX, py, oppColor, oppName);
+  players.push(mePlayer, oppPlayer);
 
-  // Firebase listener for opponent state + result
-  const unsub = dbOn("onlineMatches/" + onlineMatchId, (data) => {
+  // Generate initial balls deterministically (same on both clients)
+  for (let i = 0; i < startN; i++) {
+    balls.push(makeOnlineBall(speedMult));
+  }
+  onlineBallSpawnTimer = Date.now();
+
+  // Show HUD
+  document.getElementById("onlineNameMe").textContent  = myName;
+  document.getElementById("onlineNameOpp").textContent = oppName;
+  document.getElementById("onlineHUD").style.display   = "flex";
+  document.getElementById("pingDisplay").style.display = "block";
+
+  // ── Firebase listener: opponent position + result ──
+  const matchUnsub = dbOn("onlineMatches/" + onlineMatchId, (data) => {
     if (!data) return;
+
+    // Read opponent's position
     const oppRole = onlineRole === "p1" ? "p2" : "p1";
-    const d = data[oppRole + "State"];
-    if (d) {
-      const oppPlayer = players.find(p => p.name !== onlineAccount.name);
-      if (oppPlayer) {
-        oppPlayer.x     = d.x;
-        oppPlayer.y     = d.y;
-        oppPlayer.alive = d.alive !== false;
+    const oppState = data[oppRole + "State"];
+    if (oppState) {
+      const op = players.find(p => p.name !== myName);
+      if (op) {
+        // Interpolate towards received position
+        op.tx    = oppState.x;
+        op.ty    = oppState.y;
+        op.alive = oppState.alive !== false;
       }
     }
+
+    // Read ball state (only if we're not host — host owns balls)
+    if (!onlineIsHost && data.ballState) {
+      try {
+        const bs = JSON.parse(data.ballState);
+        balls = bs.map(b => ({ ...b }));
+      } catch(e) {}
+    }
+
+    // Handle game result
     if (data.status === "done" && data.winner && !onlineResultHandled) {
       handleOnlineResult(data.winner, data.eloChange || 10);
     }
     if (data.status === "abandoned" && !onlineResultHandled) {
       onlineResultHandled = true;
       running = false;
-      alert("Opponent disconnected. You win!");
-      handleOnlineResult(onlineAccount.name, 5);
+      handleOnlineResult(myName, 5);
+    }
+    if (data.status === "waiting") {
+      document.getElementById("onlineStatusHUD").textContent = "Waiting for opponent…";
+    } else {
+      document.getElementById("onlineStatusHUD").textContent = "";
     }
   });
-  onlineUnsubscribes.push(unsub);
+  onlineUnsubscribes.push(matchUnsub);
 
-  // Ping display interval (stored separately, not in spawnTimeoutId)
-  const pingInterval = setInterval(async () => {
-    if (!running || mode !== "online") { clearInterval(pingInterval); return; }
+  // Mark match as active once both are ready
+  dbUpdate("onlineMatches/" + onlineMatchId, {
+    [onlineRole + "Ready"]: true
+  }).catch(() => {});
+
+  // Ping interval
+  const pingIv = setInterval(async () => {
+    if (!running || mode !== "online") { clearInterval(pingIv); return; }
     const t0 = Date.now();
     try {
       await dbSet("onlineMatches/" + onlineMatchId + "/ping_" + onlineRole, Date.now());
       document.getElementById("pingDisplay").textContent = "📶 " + (Date.now() - t0) + " ms";
     } catch(e) {}
-  }, 2000);
+  }, 3000);
 }
 
+// Make a ball using shared deterministic RNG
+function makeOnlineBall(speedMult) {
+  speedMult = speedMult || ballSpeedMultiplier;
+  const rng = onlineRng || Math.random;
+  const r   = 15 + rng() * 20;
+  let x = r + rng() * (W() - r * 2);
+  let y = r + rng() * (H() - r * 2);
+  const spd = 5 + rng() * 6;
+  const ang = rng() * Math.PI * 2;
+  return {
+    x, y, radius: r,
+    vx: Math.cos(ang) * spd * speedMult,
+    vy: Math.sin(ang) * spd * speedMult
+  };
+}
+
+// Push my position (only position, not physics)
 let lastPosPush = 0;
 function pushMyPosition() {
   if (!fbReady || !onlineMatchId || !running || mode !== "online") return;
@@ -729,16 +860,32 @@ function pushMyPosition() {
   }).catch(() => {});
 }
 
+// Host pushes ball state so both clients are in sync
+let lastBallPush = 0;
+function pushBallState() {
+  if (!onlineIsHost || !fbReady || !onlineMatchId || !running) return;
+  const now = Date.now();
+  if (now - lastBallPush < 80) return; // ~12fps for balls is fine
+  lastBallPush = now;
+  const bs = JSON.stringify(balls.map(b => ({
+    x: Math.round(b.x), y: Math.round(b.y),
+    vx: parseFloat(b.vx.toFixed(2)), vy: parseFloat(b.vy.toFixed(2)),
+    radius: b.radius
+  })));
+  dbUpdate("onlineMatches/" + onlineMatchId, { ballState: bs }).catch(() => {});
+}
+
 function handleOnlineResult(winnerName, change) {
   if (onlineResultHandled) return;
   onlineResultHandled = true;
   running = false;
   clearAllTimers();
+  document.getElementById("onlineHUD").style.display = "none";
 
   const won       = winnerName === onlineAccount.name;
   const eloChange = Math.round(change);
-  if (won) { onlineAccount.elo += eloChange;                                       onlineAccount.wins++;   }
-  else     { onlineAccount.elo  = Math.max(100, onlineAccount.elo - eloChange);   onlineAccount.losses++; }
+  if (won) { onlineAccount.elo += eloChange; onlineAccount.wins++;   }
+  else     { onlineAccount.elo  = Math.max(100, onlineAccount.elo - eloChange); onlineAccount.losses++; }
   saveAccountLocal();
   if (fbReady) pushAccountToFirebase();
 
@@ -802,10 +949,10 @@ function updateAI(p, activeBalls) {
   moveX /= moveDist; moveY /= moveDist;
   let avoidX = 0, avoidY = 0;
   const wallMargin = 140;
-  if (p.x < wallMargin)        avoidX += (wallMargin - p.x) * 0.03;
-  if (p.x > W()-wallMargin)    avoidX -= (p.x - (W()-wallMargin)) * 0.03;
-  if (p.y < wallMargin)        avoidY += (wallMargin - p.y) * 0.03;
-  if (p.y > H()-wallMargin)    avoidY -= (p.y - (H()-wallMargin)) * 0.03;
+  if (p.x < wallMargin)     avoidX += (wallMargin - p.x) * 0.03;
+  if (p.x > W()-wallMargin) avoidX -= (p.x - (W()-wallMargin)) * 0.03;
+  if (p.y < wallMargin)     avoidY += (wallMargin - p.y) * 0.03;
+  if (p.y > H()-wallMargin) avoidY -= (p.y - (H()-wallMargin)) * 0.03;
   for (const b of activeBalls) {
     const dx = p.x - b.x, dy = p.y - b.y;
     const dist = Math.sqrt(dx*dx + dy*dy) || 1;
@@ -828,7 +975,6 @@ function updateAI(p, activeBalls) {
   p.lastVX = vx; p.lastVY = vy;
 }
 
-
 // ═══════════════════════════════════════════════
 //  PLAYER FACTORY
 // ═══════════════════════════════════════════════
@@ -841,7 +987,9 @@ function createPlayer(x, y, color, name) {
     aggression: Math.random()
   };
   return {
-    x, y, radius: playerRadiusSetting, color, name,
+    x, y,
+    tx: x, ty: y,  // target position for interpolation
+    radius: playerRadiusSetting, color, name,
     points: 0, elo: 1500, lastChange: 0, alive: true, games: 0,
     skill,
     speed:      2 + skill.movement * 8 + skill.aggression * 2,
@@ -857,9 +1005,8 @@ function createPlayer(x, y, color, name) {
   };
 }
 
-
 // ═══════════════════════════════════════════════
-//  BALLS
+//  BALLS (non-online)
 // ═══════════════════════════════════════════════
 function makeBallAt(playersArr) {
   const r = 15 + Math.random() * 20;
@@ -884,7 +1031,6 @@ function makeBallAt(playersArr) {
 function createBall()              { balls.push(makeBallAt(players)); }
 function createBallForMatch(match) { match.balls.push(makeBallAt(match.players)); }
 
-// FIX: spawnLoop uses spawnTimeoutId (not mixed with interval IDs)
 function spawnLoop() {
   if (!running) return;
   spawnTimeoutId = setTimeout(() => {
@@ -927,9 +1073,7 @@ function startCoinMode() {
       document.getElementById("coinHUD").style.display = "none";
       document.getElementById("finalTime").textContent  = coinScorePlayer + " Coins";
       showScreen("gameOver");
-      return;
-    }
-    if (Math.random() < 0.4) spawnCoin();
+    } else if (Math.random() < 0.4) spawnCoin();
   }, 1000);
 }
 
@@ -957,7 +1101,6 @@ function startSurvivalMode() {
 // ═══════════════════════════════════════════════
 function startMirrorMode() {
   mode = "mirror"; players = []; mirrorBot = null;
-  // FIX: push me first so players[0] is always the human
   const me = createPlayer(W() * 0.3, H() / 2, "#00ff88", "YOU");
   mirrorBot = createPlayer(W() * 0.7, H() / 2, "#ff88aa", "Mirror");
   const s = 0.5 + Math.random() * 0.4;
@@ -986,11 +1129,11 @@ function startGame(selectedMode) {
   document.getElementById("spectatorInfo").style.display = "none";
   document.getElementById("profileModal").style.display  = "none";
   document.getElementById("winnerOverlay").style.display = "none";
+  document.getElementById("onlineHUD").style.display     = "none";
 
   mode = selectedMode;
   document.getElementById("eloTable").style.display = (mode === "tournament") ? "block" : "none";
 
-  // FIX: reset UI correctly for all modes
   if (mode === "tournament") {
     document.getElementById("ui").innerHTML =
       `ELO: <span id="time">1500</span><br>Rank: <span id="record">1</span><br>Players: <span id="balls">0</span><br>Mode: <span id="mode">tournament</span>`;
@@ -1003,7 +1146,6 @@ function startGame(selectedMode) {
   balls = []; players = []; eliminated = [];
   running = true; startTime = Date.now();
 
-  // FIX: only build ranking for non-multi, non-tournament modes; clear old ranking first
   if (mode !== "multi" && mode !== "tournament") {
     if (ranking.length === 0) {
       for (let i = 0; i < aiBotCount; i++)
@@ -1052,7 +1194,6 @@ function startGame(selectedMode) {
   } else if (mode === "mirror")   { startMirrorMode();   return;
   }
 
-  // FIX: only call updateRanking when ranking data exists and is relevant
   if (["single","ai","multi"].includes(mode)) updateRanking();
 }
 
@@ -1098,7 +1239,6 @@ function startTournament() {
 function seededMatchmaking() {
   if (waitingQueue.length < 2) return;
   const used = new Set();
-
   function findBestOpponent(p1, list) {
     let best = null, bestDiff = Infinity;
     for (const p2 of list) {
@@ -1109,7 +1249,6 @@ function seededMatchmaking() {
     }
     return best;
   }
-
   const queue = [...waitingQueue];
   waitingQueue = [];
   for (const p1 of queue) {
@@ -1154,14 +1293,14 @@ function setupMatch(match) {
 }
 
 // ═══════════════════════════════════════════════
-//  GAME LOOP  — FIX: was never started
+//  GAME LOOP
 // ═══════════════════════════════════════════════
 function loop() {
   update();
   draw();
   requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop); // ← THE MISSING CALL
+requestAnimationFrame(loop);
 
 function restartGame() {
   clearAllTimers();
@@ -1196,8 +1335,56 @@ function update() {
   const bel = document.getElementById("balls");
   if (bel) bel.textContent = balls.length;
 
-  if (mode === "online") pushMyPosition();
+  // ── Online mode ──
+  if (mode === "online") {
+    pushMyPosition();
 
+    // Host: advance ball physics and push state
+    if (onlineIsHost) {
+      // Spawn new ball periodically
+      if (Date.now() - onlineBallSpawnTimer > onlineSpawnInterval) {
+        onlineBallSpawnTimer = Date.now();
+        balls.push(makeOnlineBall(ballSpeedMultiplier));
+      }
+      // Move balls (host owns physics)
+      for (const b of balls) {
+        b.x += b.vx; b.y += b.vy;
+        if (b.x - b.radius < 0)   { b.vx =  Math.abs(b.vx); b.x = b.radius; }
+        if (b.x + b.radius > W()) { b.vx = -Math.abs(b.vx); b.x = W()-b.radius; }
+        if (b.y - b.radius < 0)   { b.vy =  Math.abs(b.vy); b.y = b.radius; }
+        if (b.y + b.radius > H()) { b.vy = -Math.abs(b.vy); b.y = H()-b.radius; }
+      }
+      pushBallState();
+    }
+    // p2: balls come from Firebase (updated in listener), just clamp to screen
+    else {
+      for (const b of balls) {
+        b.x = Math.max(b.radius, Math.min(W() - b.radius, b.x));
+        b.y = Math.max(b.radius, Math.min(H() - b.radius, b.y));
+      }
+    }
+
+    // Interpolate opponent position smoothly
+    for (const p of players) {
+      if (p.name !== onlineAccount.name && p.tx !== undefined) {
+        p.x += (p.tx - p.x) * 0.3;
+        p.y += (p.ty - p.y) * 0.3;
+      }
+    }
+
+    // Clamp me
+    const me = players.find(p => p.name === onlineAccount.name);
+    if (me) {
+      me.x = Math.max(me.radius, Math.min(W()-me.radius, me.x));
+      me.y = Math.max(me.radius, Math.min(H()-me.radius, me.y));
+    }
+
+    // Collision check only for me
+    if (me && me.alive) checkOnlineCollision(me);
+    return;
+  }
+
+  // ── Multi ──
   if (mode === "multi") {
     const p1 = players[0], p2 = players[1];
     if (p1 && p1.alive) {
@@ -1210,13 +1397,11 @@ function update() {
     }
   }
 
-  // AI — skip human-controlled players and online opponent
+  // AI
   for (const p of players) {
     if (!p.alive) continue;
     const humanNames = ["Player","Player 1","Player 2","YOU"];
-    const isHuman       = humanNames.includes(p.name);
-    const isOnlineOpp   = mode === "online" && p.name !== onlineAccount?.name;
-    if (!isHuman && !isOnlineOpp) updateAI(p, balls);
+    if (!humanNames.includes(p.name)) updateAI(p, balls);
   }
 
   // Clamp
@@ -1253,8 +1438,21 @@ function update() {
     }
   }
 
-  // Collision check
   for (const p of players) checkCollision(p);
+}
+
+// ── Online collision: only check local player, report result ──
+function checkOnlineCollision(me) {
+  for (const b of balls) {
+    const dx = me.x - b.x, dy = me.y - b.y;
+    if (Math.sqrt(dx*dx + dy*dy) < me.radius + b.radius) {
+      me.alive = false;
+      // Report: the other player wins
+      const opp = players.find(p => p.name !== me.name);
+      reportOnlineResult(opp ? opp.name : "", me.name);
+      return;
+    }
+  }
 }
 
 function updateTournament() {
@@ -1307,19 +1505,8 @@ function checkCollision(p) {
       p.alive = false;
       p.deathTime = Date.now();
       eliminated.push(p);
-
-      if (mode === "online") {
-        const alive      = players.filter(x => x.alive);
-        const winnerName = alive.length > 0
-          ? alive[0].name
-          : (players.find(x => x !== p)?.name || "");
-        reportOnlineResult(winnerName, p.name);
-        return;
-      }
-
       const alive = players.filter(x => x.alive);
       if (alive.length <= 1) {
-        // FIX: guard against alive[0] already being in eliminated
         if (alive.length === 1 && !eliminated.includes(alive[0])) {
           alive[0].deathTime = Infinity;
           eliminated.push(alive[0]);
@@ -1360,9 +1547,9 @@ function finishMatch(match, winner, loser) {
   match.running = false;
   const diff   = loser.elo - winner.elo;
   const change = Math.max(1, Math.min(15, 5 + diff / 100));
-  winner.elo += change;  loser.elo -= change;
+  winner.elo += change; loser.elo -= change;
   winner.lastChange = change; loser.lastChange = -change;
-  winner.alive = true;   loser.alive = true;
+  winner.alive = true; loser.alive = true;
   winner.arenaScore = (winner.arenaScore || 0) + 1;
 
   if (winner.stats) {
@@ -1403,7 +1590,6 @@ function finishMatch(match, winner, loser) {
 function finishArena() {
   if (mode !== "tournament") running = false;
   clearAllTimers();
-  // FIX: stable sort — treat equal deathTime as equal (no NaN)
   eliminated.sort((a, b) => {
     const da = isFinite(a.deathTime) ? a.deathTime : Number.MAX_SAFE_INTEGER;
     const db = isFinite(b.deathTime) ? b.deathTime : Number.MAX_SAFE_INTEGER;
@@ -1455,7 +1641,7 @@ function finishArena() {
 //  RANKING / ELO TABLE
 // ═══════════════════════════════════════════════
 function updateRanking() {
-  if (!ranking.length) return; // FIX: guard empty array
+  if (!ranking.length) return;
   const sorted = rankingMode === "elo"
     ? [...ranking].sort((a,b) => b.elo    - a.elo)
     : [...ranking].sort((a,b) => b.points - a.points);
@@ -1632,7 +1818,6 @@ function draw() {
       ctx.fillText(p.name, p.x, p.y - p.radius - 10);
     }
 
-    // Banner
     if (matchBanner && Date.now() - matchBanner.ts < matchBanner.duration) {
       const alpha = 1 - Math.max(0, (Date.now() - matchBanner.ts - 1800) / (matchBanner.duration - 1800));
       ctx.save(); ctx.globalAlpha = alpha;
@@ -1645,7 +1830,6 @@ function draw() {
       matchBanner = null;
     }
 
-    // Opponent / spectator info panels
     const oppDiv  = document.getElementById("opponentInfo");
     const specDiv = document.getElementById("spectatorInfo");
     if (!spectateModeActive && !humanRemovedFromQueue) {
@@ -1710,10 +1894,21 @@ function draw() {
     ctx.fillStyle = "white"; ctx.font = "14px Arial"; ctx.textAlign = "center";
     ctx.fillText(p.name, p.x, p.y - p.radius - 10);
   }
+
+  // ── ONLINE: draw death overlay ──
+  if (mode === "online") {
+    const me = players.find(p => p.name === onlineAccount?.name);
+    if (me && !me.alive) {
+      ctx.fillStyle = "rgba(255,0,0,0.18)";
+      ctx.fillRect(0, 0, W(), H());
+      ctx.fillStyle = "white"; ctx.font = "bold 48px Arial"; ctx.textAlign = "center";
+      ctx.fillText("💀 You died! Waiting for result…", W()/2, H()/2);
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════
-//  CONTROLS
+//  CONTROLS — fixed touch offset for iPhone
 // ═══════════════════════════════════════════════
 function moveSingle(x, y) {
   if (spectateModeActive || humanRemovedFromQueue) return;
@@ -1725,7 +1920,7 @@ function moveSingle(x, y) {
     if (me && me.alive) {
       me.x = Math.max(me.radius, Math.min(W()-me.radius, x));
       me.y = Math.max(me.radius, Math.min(H()-me.radius, y));
-          }
+    }
     return;
   }
 
@@ -1738,7 +1933,6 @@ function moveSingle(x, y) {
     return;
   }
 
-  // Single / coin / survival / mirror — players[0] is always the human
   if (players[0] && players[0].alive) {
     players[0].x = Math.max(players[0].radius, Math.min(W()-players[0].radius, x));
     players[0].y = Math.max(players[0].radius, Math.min(H()-players[0].radius, y));
@@ -1753,14 +1947,24 @@ canvas.addEventListener("mousemove", e => {
     moveSingle(e.clientX, e.clientY);
 });
 
+// Fix: use getBoundingClientRect for correct coordinates on all devices including iPhone
 canvas.addEventListener("touchmove", e => {
   e.preventDefault();
-  if (running && ["single","tournament","coin","mirror","online","survival"].includes(mode))
-    moveSingle(e.touches[0].clientX, e.touches[0].clientY);
+  if (!running) return;
+  if (!["single","tournament","coin","mirror","online","survival"].includes(mode)) return;
+  const touch = e.touches[0];
+  const pos   = getTouchPos(touch);
+  moveSingle(pos.x, pos.y);
 }, { passive: false });
 
+canvas.addEventListener("touchstart", e => {
+  e.preventDefault();
+  if (!running) return;
+  if (!["single","tournament","coin","mirror","online","survival"].includes(mode)) return;
+  const touch = e.touches[0];
+  const pos   = getTouchPos(touch);
+  moveSingle(pos.x, pos.y);
+}, { passive: false });
 </script>
 </body>
 </html>
-
-    
