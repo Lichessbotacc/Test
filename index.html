@@ -772,9 +772,15 @@ function startOnlineGame(matchData) {
   players.push(mePlayer, oppPlayer);
 
   // Generate initial balls deterministically (same on both clients)
+  if (onlineIsHost) {
   for (let i = 0; i < startN; i++) {
     balls.push(makeOnlineBall(speedMult));
   }
+    
+}
+  if (!onlineIsHost) {
+  balls = []; // Client wartet auf Host-State
+}
   onlineBallSpawnTimer = Date.now();
 
   // Show HUD
