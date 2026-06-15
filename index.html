@@ -1,23 +1,3 @@
-Hier ist der vollständig überarbeitete und gefixte Code. Alle Bugs wurden behoben und der Online-Modus wurde komplett neu implementiert:
-
-Behobene Probleme:
-• Online-Synchronisation (Positionen, Alive-Status)
-• Firebase onValue doppelt registriert → jetzt sauber mit einem Listener
-• resize() wurde nie aufgerufen → jetzt korrekt initialisiert
-• Canvas-Koordinaten mit DPR falsch berechnet → gefixed
-• Spieler in moveSingle konnten nach Tod noch bewegt werden
-• spawnTimer war mal setTimeout, mal setInterval → vereinheitlicht
-• Tournament: YOU-Spieler hatte falschen Skill-Typ (number vs object)
-• checkCollision im Online-Modus löste mehrfach aus
-• Online-Match: Gegner wurde als lokaler Bot simuliert, jetzt echter Sync
-• dbOn überschrieb onValue-Listener → zusammengeführt
-• Fehlende resize-Aufrufe bei Fenstergrößenänderung
-• ctx.roundRect nicht in allen Browsern verfügbar → Fallback
-• Coin-Modus: Bots sammelten keine Münzen (war unvollständig)
-• Survival-Modus: clearInterval auf falschen Timer
-• Mirror-Modus: Spiegel-Bot hatte falschen Skill-Typ
-
-``html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,15 +6,15 @@ Behobene Probleme:
 <title>DarkOnBalls</title>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { initializeApp } from "[gstatic.com](https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js)";
   import { getDatabase, ref, set, get, onValue, push, remove, update, serverTimestamp, onDisconnect }
-    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+    from "[gstatic.com](https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js)";
+  import { getAnalytics } from "[gstatic.com](https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js)";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDKwJDGSxRDBf9ihi1-T70pC6UzY6kLYb4",
     authDomain: "darkonballs.firebaseapp.com",
-    databaseURL: "https://darkonballs-default-rtdb.europe-west1.firebasedatabase.app",
+    databaseURL: "[darkonballs-default-rtdb.europe-west1.firebasedatabase.app](https://darkonballs-default-rtdb.europe-west1.firebasedatabase.app)",
     projectId: "darkonballs",
     storageBucket: "darkonballs.firebasestorage.app",
     messagingSenderId: "423459139682",
@@ -52,22 +32,22 @@ Behobene Probleme:
     console.warn("Firebase init failed – online mode disabled.", e);
   }
 
-  window.firebaseDB           = db;
-  window.firebaseRef          = ref;
-  window.firebaseSet          = set;
-  window.firebaseGet          = get;
-  window.firebaseOnValue      = onValue;
-  window.firebasePush         = push;
-  window.firebaseRemove       = remove;
-  window.firebaseUpdate       = update;
-  window.firebaseServerTimestamp = serverTimestamp;
-  window.firebaseOnDisconnect = onDisconnect;
-  window.firebaseReady        = true;
+  window._firebaseDB           = db;
+  window._firebaseRef          = ref;
+  window._firebaseSet          = set;
+  window._firebaseGet          = get;
+  window._firebaseOnValue      = onValue;
+  window._firebasePush         = push;
+  window._firebaseRemove       = remove;
+  window._firebaseUpdate       = update;
+  window._firebaseServerTimestamp = serverTimestamp;
+  window._firebaseOnDisconnect = onDisconnect;
+  window._firebaseReady        = true;
   window.dispatchEvent(new Event("firebaseReady"));
 </script>
 
 <style>
-{margin:0;padding:0;box-sizing:border-box;}
+*{margin:0;padding:0;box-sizing:border-box;}
 body{overflow:hidden;background:#111;font-family:Arial,sans-serif;}
 canvas{display:block;touch-action:none;}
 
@@ -304,8 +284,8 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   canvas.style.width  = window.innerWidth  + "px";
   canvas.style.height = window.innerHeight + "px";
-  canvas.width  = window.innerWidth   dpr;
-  canvas.height = window.innerHeight  dpr;
+  canvas.width  = window.innerWidth  * dpr;
+  canvas.height = window.innerHeight * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 resize();
@@ -342,15 +322,15 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 let fbReady = false;
 window.addEventListener("firebaseReady", () => { fbReady = true; });
 
-function dbRef(path)          { return window.firebaseRef(window.firebaseDB, path); }
-async function dbGet(path)    { return (await window.firebaseGet(dbRef(path))).val(); }
-async function dbSet(path,v)  { return window.firebaseSet(dbRef(path), v); }
-async function dbUpdate(path,v){ return window.firebaseUpdate(dbRef(path), v); }
+function dbRef(path)          { return window._firebaseRef(window._firebaseDB, path); }
+async function dbGet(path)    { return (await window._firebaseGet(dbRef(path))).val(); }
+async function dbSet(path,v)  { return window._firebaseSet(dbRef(path), v); }
+async function dbUpdate(path,v){ return window._firebaseUpdate(dbRef(path), v); }
 function dbOn(path, cb)       {
-  const unsub = window.firebaseOnValue(dbRef(path), snap => cb(snap.val()));
+  const unsub = window._firebaseOnValue(dbRef(path), snap => cb(snap.val()));
   return unsub; // returns unsubscribe function
 }
-async function dbRemove(path) { return window.firebaseRemove(dbRef(path)); }
+async function dbRemove(path) { return window._firebaseRemove(dbRef(path)); }
 
 // ═══════════════════════════════════════════════
 //  ACCOUNT
@@ -388,7 +368,7 @@ let rankingMode        = "points";
 function openSettings() { showScreen("settings"); }
 function saveSettings() {
   startBallCount      = Number(document.getElementById("startBalls").value);
-  spawnDelay          = Number(document.getElementById("spawnTime").value)  1000;
+  spawnDelay          = Number(document.getElementById("spawnTime").value) * 1000;
   ballSpeedMultiplier = Number(document.getElementById("ballSpeed").value);
   aiBotCount          = Number(document.getElementById("botCount").value);
   rankingMode         = document.getElementById("rankingMode").value;
@@ -458,14 +438,14 @@ function clearAllTimers() {
 // ═══════════════════════════════════════════════
 //  SCREEN ROUTER
 // ═══════════════════════════════════════════════
-const ALLSCREENS = [
+const ALL_SCREENS = [
   "menu","settings","accountScreen","leaderboardScreen",
   "onlineWait","vsScreen","winnerOverlay","gameOver"
 ];
 
 window.showScreen = function(id) {
-  if (id === "onlineFlow") { showScreenonlineFlow(); return; }
-  ALLSCREENS.forEach(s => {
+  if (id === "onlineFlow") { showScreen_onlineFlow(); return; }
+  ALL_SCREENS.forEach(s => {
     const el = document.getElementById(s);
     if (el) el.style.display = (s === id) ? "flex" : "none";
   });
@@ -482,7 +462,7 @@ function showEloAnimation(change) {
   el.style.animation = "none";
   el.offsetHeight; // reflow
   el.style.color      = won ? "#00ff88" : "#ff4444";
-  el.style.textShadow = 0 0 40px ${won ? "#00ff88" : "#ff4444"};
+  el.style.textShadow = `0 0 40px ${won ? "#00ff88" : "#ff4444"}`;
   el.innerHTML = (won ? "✓ +" : "✗ ") + Math.round(Math.abs(change)) + " ELO<br>"
     + (won ? '<span style="font-size:40px">WIN</span>' : '<span style="font-size:40px">LOST</span>');
   el.style.animation = "eloPopIn 2.5s ease forwards";
@@ -500,10 +480,10 @@ async function loadLeaderboard() {
     if (!data) { lbTable.innerHTML += '<div class="lb-row"><span>No players yet</span></div>'; return; }
     Object.values(data).sort((a,b) => b.elo - a.elo).forEach((p,i) => {
       const isMe = onlineAccount && p.name === onlineAccount.name;
-      lbTable.innerHTML += <div class="lb-row${isMe?" lb-me":""}">
+      lbTable.innerHTML += `<div class="lb-row${isMe?" lb-me":""}">
         <span>#${i+1}</span><span>${p.name}</span>
         <span>${Math.round(p.elo)}</span>
-        <span>${p.wins||0}/${p.losses||0}</span></div>;
+        <span>${p.wins||0}/${p.losses||0}</span></div>`;
     });
   } catch(e) { lbTable.innerHTML += '<div class="lb-row"><span>Error loading</span></div>'; }
 }
@@ -511,14 +491,14 @@ async function loadLeaderboard() {
 // ═══════════════════════════════════════════════
 //  ONLINE FLOW
 // ═══════════════════════════════════════════════
-function showScreenonlineFlow() {
+function showScreen_onlineFlow() {
   if (!onlineAccount) showCreateAccount();
   else enterOnlineQueue();
 }
 
 function showCreateAccount() {
   showScreen("accountScreen");
-  document.getElementById("accountContent").innerHTML = 
+  document.getElementById("accountContent").innerHTML = `
     <p style="color:#aaa;margin-bottom:18px;font-size:16px;">Choose your username</p>
     <input type="text" id="newUsername" placeholder="Username" maxlength="20">
     <br>
@@ -526,14 +506,14 @@ function showCreateAccount() {
     <br>
     <button onclick="createAccount()">Create Account</button>
     <button onclick="showScreen('menu')">← Back</button>
-  ;
+  `;
 }
 
 async function createAccount() {
   const name = document.getElementById("newUsername").value.trim();
   const info = document.getElementById("accountInfo");
   if (!name || name.length < 2)             { info.textContent = "Name must be at least 2 characters."; info.style.color="#f44"; return; }
-  if (!/^[a-zA-Z0-9-]+$/.test(name))       { info.textContent = "Only letters, numbers,  and - allowed."; info.style.color="#f44"; return; }
+  if (!/^[a-zA-Z0-9_-]+$/.test(name))       { info.textContent = "Only letters, numbers, _ and - allowed."; info.style.color="#f44"; return; }
   if (fbReady) {
     const existing = await dbGet("players/" + name);
     if (existing)                            { info.textContent = "Name already taken."; info.style.color="#f44"; return; }
@@ -622,7 +602,7 @@ async function tryMatchmake() {
 
   others.sort((a,b) => Math.abs(a.elo - onlineAccount.elo) - Math.abs(b.elo - onlineAccount.elo));
   const opp     = others[0];
-  const matchId = [onlineAccount.name, opp.name].sort().join("_");
+  const matchId = [onlineAccount.name, opp.name].sort().join("__");
 
   // Atomic check: has someone already created this match?
   const existing = await dbGet("onlineMatches/" + matchId);
@@ -702,8 +682,8 @@ function startOnlineGame() {
   const myColor  = onlineRole === "p1" ? "#00ff88" : "#ff8844";
   const oppColor = onlineRole === "p1" ? "#ff8844" : "#00ff88";
 
-  const me  = createPlayer(W()  0.3, H() / 2, myColor,  onlineAccount.name);
-  const opp = createPlayer(W()  0.7, H() / 2, oppColor, onlineOpponent.name);
+  const me  = createPlayer(W() * 0.3, H() / 2, myColor,  onlineAccount.name);
+  const opp = createPlayer(W() * 0.7, H() / 2, oppColor, onlineOpponent.name);
   players.push(me, opp);
 
   // Spawn balls – online uses faster spawns
@@ -751,7 +731,7 @@ function startOnlineGame() {
     if (!running || mode !== "online") { clearInterval(pingInterval); return; }
     pingStart = Date.now();
     try {
-      await dbSet("onlineMatches/" + onlineMatchId + "/ping" + onlineRole, Date.now());
+      await dbSet("onlineMatches/" + onlineMatchId + "/ping_" + onlineRole, Date.now());
       document.getElementById("pingDisplay").textContent = "📶 " + (Date.now() - pingStart) + " ms";
     } catch(e) {}
   }, 2000);
@@ -801,9 +781,9 @@ function handleOnlineResult(winnerName, change) {
 
 function showWinnerOverlay(winnerName, eloChange) {
   document.getElementById("winnerText").innerHTML =
-    🏆 Winner: <span style="color:gold">${winnerName}</span>;
+    `🏆 Winner: <span style="color:gold">${winnerName}</span>`;
   document.getElementById("winnerEloChange").textContent =
-    Your ELO: ${Math.round(onlineAccount.elo)} (${eloChange >= 0 ? "+" : ""}${Math.round(eloChange)});
+    `Your ELO: ${Math.round(onlineAccount.elo)} (${eloChange >= 0 ? "+" : ""}${Math.round(eloChange)})`;
 
   const btns = document.getElementById("winnerButtons");
   btns.innerHTML = "";
@@ -835,58 +815,58 @@ function updateAI(p, activeBalls) {
   if (!p.alive) return;
   const skill      = getSkillValue(p);
   const inaccuracy = 1 - skill;
-  if (Math.random() < inaccuracy  0.04) return;
+  if (Math.random() < inaccuracy * 0.04) return;
 
   let danger = false;
   for (const b of activeBalls) {
     const dx = p.x - b.x, dy = p.y - b.y;
-    if (Math.sqrt(dxdx + dydy) < (p.awareness || 100)) { danger = true; break; }
+    if (Math.sqrt(dx*dx + dy*dy) < (p.awareness || 100)) { danger = true; break; }
   }
 
   if (!danger) {
-    if (p.targetX === null || p.targetY === null || Math.random() < (0.015 + inaccuracy  0.05)) {
-      p.targetX = Math.random()  W();
-      p.targetY = Math.random()  H();
+    if (p.targetX === null || p.targetY === null || Math.random() < (0.015 + inaccuracy * 0.05)) {
+      p.targetX = Math.random() * W();
+      p.targetY = Math.random() * H();
     }
   }
 
   let moveX = (p.targetX || W()/2) - p.x;
   let moveY = (p.targetY || H()/2) - p.y;
-  moveX += (Math.random() - 0.5)  120  inaccuracy;
-  moveY += (Math.random() - 0.5)  120  inaccuracy;
-  let moveDist = Math.sqrt(moveXmoveX + moveYmoveY) || 1;
+  moveX += (Math.random() - 0.5) * 120 * inaccuracy;
+  moveY += (Math.random() - 0.5) * 120 * inaccuracy;
+  let moveDist = Math.sqrt(moveX*moveX + moveY*moveY) || 1;
   moveX /= moveDist; moveY /= moveDist;
 
   let avoidX = 0, avoidY = 0;
   const wallMargin = 140;
-  if (p.x < wallMargin)          avoidX += (wallMargin - p.x)  0.03;
-  if (p.x > W() - wallMargin)    avoidX -= (p.x - (W() - wallMargin))  0.03;
-  if (p.y < wallMargin)          avoidY += (wallMargin - p.y)  0.03;
-  if (p.y > H() - wallMargin)    avoidY -= (p.y - (H() - wallMargin))  0.03;
+  if (p.x < wallMargin)          avoidX += (wallMargin - p.x) * 0.03;
+  if (p.x > W() - wallMargin)    avoidX -= (p.x - (W() - wallMargin)) * 0.03;
+  if (p.y < wallMargin)          avoidY += (wallMargin - p.y) * 0.03;
+  if (p.y > H() - wallMargin)    avoidY -= (p.y - (H() - wallMargin)) * 0.03;
 
   for (const b of activeBalls) {
     const dx = p.x - b.x, dy = p.y - b.y;
-    const dist = Math.sqrt(dxdx + dydy) || 1;
+    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
     const aw = p.awareness || 100;
     if (dist < aw) {
       const strength = Math.max(0, (aw - dist) / aw);
-      const force    = strength  (p.dodgePower || 1)  (0.7 + skill  0.6);
-      avoidX += (dx / dist)  force;
-      avoidY += (dy / dist)  force;
+      const force    = strength * (p.dodgePower || 1) * (0.7 + skill * 0.6);
+      avoidX += (dx / dist) * force;
+      avoidY += (dy / dist) * force;
     }
   }
 
   p.aiVX = p.aiVX || 0;
   p.aiVY = p.aiVY || 0;
-  const steering = 0.08 + skill  0.18;
-  p.aiVX += (moveX  4 + avoidX  10 - p.aiVX)  steering;
-  p.aiVY += (moveY  4 + avoidY  10 - p.aiVY)  steering;
-  p.aiVX += (Math.random() - 0.5)  (p.randomness || 2)  0.6;
-  p.aiVY += (Math.random() - 0.5)  (p.randomness || 2)  0.6;
+  const steering = 0.08 + skill * 0.18;
+  p.aiVX += (moveX * 4 + avoidX * 10 - p.aiVX) * steering;
+  p.aiVY += (moveY * 4 + avoidY * 10 - p.aiVY) * steering;
+  p.aiVX += (Math.random() - 0.5) * (p.randomness || 2) * 0.6;
+  p.aiVY += (Math.random() - 0.5) * (p.randomness || 2) * 0.6;
 
-  const len = Math.sqrt(p.aiVXp.aiVX + p.aiVYp.aiVY) || 1;
-  p.x += (p.aiVX / len)  (p.speed || 2);
-  p.y += (p.aiVY / len)  (p.speed || 2);
+  const len = Math.sqrt(p.aiVX*p.aiVX + p.aiVY*p.aiVY) || 1;
+  p.x += (p.aiVX / len) * (p.speed || 2);
+  p.y += (p.aiVY / len) * (p.speed || 2);
 
   p.x = Math.max(p.radius, Math.min(W() - p.radius, p.x));
   p.y = Math.max(p.radius, Math.min(H() - p.radius, p.y));
@@ -906,7 +886,7 @@ function createPlayer(x, y, color, name) {
     aggression: Math.random()
   };
   const avg     = (skill.aim + skill.reaction + skill.movement + skill.awareness + skill.aggression) / 5;
-  const balanced = 0.5 + (avg - 0.5)  0.9;
+  const balanced = 0.5 + (avg - 0.5) * 0.9;
   return {
     x, y,
     radius:    playerRadiusSetting,
@@ -918,11 +898,11 @@ function createPlayer(x, y, color, name) {
     lastChange: 0,
     alive:     true,
     games:     0,
-    speed:     1.0 + balanced  1.2,
-    reaction:  0.25 + balanced  1.0,
-    awareness: 70  + balanced  90,
-    randomness:(1 - balanced)  4.0,
-    dodgePower: 0.4 + balanced  1.6,
+    speed:     1.0 + balanced * 1.2,
+    reaction:  0.25 + balanced * 1.0,
+    awareness: 70  + balanced * 90,
+    randomness:(1 - balanced) * 4.0,
+    dodgePower: 0.4 + balanced * 1.6,
     targetX:   null,
     targetY:   null,
     lastVX:    0,
@@ -939,21 +919,21 @@ function createPlayer(x, y, color, name) {
 //  BALLS
 // ═══════════════════════════════════════════════
 function makeBallAt(playersArr) {
-  const r = 15 + Math.random()  20;
+  const r = 15 + Math.random() * 20;
   let x, y, valid = false, tries = 0;
   while (!valid && tries++ < 50) {
-    x = r + Math.random()  (W() - r  2);
-    y = r + Math.random()  (H() - r  2);
+    x = r + Math.random() * (W() - r * 2);
+    y = r + Math.random() * (H() - r * 2);
     valid = true;
     for (const p of playersArr) {
       if (!p.alive) continue;
       const dx = p.x - x, dy = p.y - y;
-      if (Math.sqrt(dxdx + dydy) < p.radius + r + 80) { valid = false; break; }
+      if (Math.sqrt(dx*dx + dy*dy) < p.radius + r + 80) { valid = false; break; }
     }
   }
-  const spd = 5 + Math.random()  6;
-  const ang = Math.random()  Math.PI  2;
-  return { x, y, radius: r, vx: Math.cos(ang)  spd  ballSpeedMultiplier, vy: Math.sin(ang)  spd  ballSpeedMultiplier };
+  const spd = 5 + Math.random() * 6;
+  const ang = Math.random() * Math.PI * 2;
+  return { x, y, radius: r, vx: Math.cos(ang) * spd * ballSpeedMultiplier, vy: Math.sin(ang) * spd * ballSpeedMultiplier };
 }
 
 function createBall()              { balls.push(makeBallAt(players)); }
@@ -970,8 +950,8 @@ function spawnLoop() {
 function spawnCoin() {
   const r = 14;
   coins.push({
-    x: r + Math.random()  (W() - r  2),
-    y: r + Math.random()  (H() - r  2),
+    x: r + Math.random() * (W() - r * 2),
+    y: r + Math.random() * (H() - r * 2),
     r, value: Math.random() < 0.15 ? 3 : 1
   });
 }
@@ -984,8 +964,8 @@ function startCoinMode() {
   players = [];
   players.push(createPlayer(W()/2, H()/2, "#00ff88", "Player"));
   for (let i = 0; i < aiBotCount; i++)
-    players.push(createPlayer(Math.random()W(), Math.random()H(),
-      hsl(${i360/aiBotCount},100%,50%), "Bot "+(i+1)));
+    players.push(createPlayer(Math.random()*W(), Math.random()*H(),
+      `hsl(${i*360/aiBotCount},100%,50%)`, "Bot "+(i+1)));
   for (let i = 0; i < 8; i++) spawnCoin();
   for (let i = 0; i < startBallCount; i++) createBall();
   spawnLoop();
@@ -1013,8 +993,8 @@ function startSurvivalMode() {
   players = [];
   players.push(createPlayer(W()/2, H()/2, "#00ff88", "Player"));
   for (let i = 0; i < aiBotCount; i++)
-    players.push(createPlayer(Math.random()W(), Math.random()H(),
-      hsl(${i360/aiBotCount},100%,50%), "Bot "+(i+1)));
+    players.push(createPlayer(Math.random()*W(), Math.random()*H(),
+      `hsl(${i*360/aiBotCount},100%,50%)`, "Bot "+(i+1)));
   for (let i = 0; i < startBallCount; i++) createBall();
 
   survivalIntervalId = setInterval(() => {
@@ -1030,15 +1010,15 @@ function startSurvivalMode() {
 // ═══════════════════════════════════════════════
 function startMirrorMode() {
   mode = "mirror"; players = []; mirrorBot = null;
-  const me = createPlayer(W()  0.3, H() / 2, "#00ff88", "YOU");
-  mirrorBot = createPlayer(W()  0.7, H() / 2, "#ff88aa", "Mirror");
+  const me = createPlayer(W() * 0.3, H() / 2, "#00ff88", "YOU");
+  mirrorBot = createPlayer(W() * 0.7, H() / 2, "#ff88aa", "Mirror");
   // Give mirror bot a balanced skill object
-  const s = 0.5 + Math.random()  0.4;
+  const s = 0.5 + Math.random() * 0.4;
   mirrorBot.skill = { aim: s, reaction: s, movement: s, awareness: s, aggression: s };
-  mirrorBot.speed      = 1.0 + s  1.2;
-  mirrorBot.awareness  = 70  + s  90;
-  mirrorBot.dodgePower = 0.4 + s  1.6;
-  mirrorBot.randomness = (1-s)  4;
+  mirrorBot.speed      = 1.0 + s * 1.2;
+  mirrorBot.awareness  = 70  + s * 90;
+  mirrorBot.dodgePower = 0.4 + s * 1.6;
+  mirrorBot.randomness = (1-s) * 4;
   players.push(me, mirrorBot);
   for (let i = 0; i < startBallCount; i++) createBall();
   spawnLoop();
@@ -1066,10 +1046,10 @@ function startGame(selectedMode) {
 
   if (mode === "tournament") {
     document.getElementById("ui").innerHTML =
-      ELO: <span id="time">1500</span><br>Rank: <span id="record">1</span><br>Players: <span id="balls">0</span><br>Mode: <span id="mode">tournament</span>;
+      `ELO: <span id="time">1500</span><br>Rank: <span id="record">1</span><br>Players: <span id="balls">0</span><br>Mode: <span id="mode">tournament</span>`;
   } else {
     document.getElementById("ui").innerHTML =
-      Time: <span id="time">0</span>s<br>Record: <span id="record">${record}</span>s<br>Balls: <span id="balls">0</span><br>Mode: <span id="mode">${mode}</span>;
+      `Time: <span id="time">0</span>s<br>Record: <span id="record">${record}</span>s<br>Balls: <span id="balls">0</span><br>Mode: <span id="mode">${mode}</span>`;
   }
 
   hideAllScreensForGame();
@@ -1078,7 +1058,7 @@ function startGame(selectedMode) {
 
   if (mode !== "multi" && ranking.length === 0) {
     for (let i = 0; i < aiBotCount; i++)
-      ranking.push(createPlayer(0, 0, hsl(${i360/aiBotCount},100%,50%), "Bot "+(i+1)));
+      ranking.push(createPlayer(0, 0, `hsl(${i*360/aiBotCount},100%,50%)`, "Bot "+(i+1)));
   }
 
   if (mode === "single") {
@@ -1087,7 +1067,7 @@ function startGame(selectedMode) {
     players.push(createPlayer(W()/2, H()/2, "#00ff88", "Player"));
     for (const bot of ranking) {
       if (bot.name === "Player") continue;
-      const nb = createPlayer(Math.random()W(), Math.random()H(), bot.color, bot.name);
+      const nb = createPlayer(Math.random()*W(), Math.random()*H(), bot.color, bot.name);
       nb.elo = bot.elo; nb.points = bot.points; nb.lastChange = bot.lastChange;
       players.push(nb);
     }
@@ -1100,8 +1080,8 @@ function startGame(selectedMode) {
       createPlayer(400, 200, "#4488ff", "Player 2")
     );
     for (let i = 0; i < aiBotCount; i++)
-      players.push(createPlayer(Math.random()W(), Math.random()H(),
-        hsl(${i360/aiBotCount},100%,50%), "Bot "+(i+1)));
+      players.push(createPlayer(Math.random()*W(), Math.random()*H(),
+        `hsl(${i*360/aiBotCount},100%,50%)`, "Bot "+(i+1)));
     for (let i = 0; i < startBallCount; i++) createBall();
     spawnLoop();
 
@@ -1110,7 +1090,7 @@ function startGame(selectedMode) {
 
   } else if (mode === "ai") {
     for (const bot of ranking) {
-      const nb = createPlayer(Math.random()W(), Math.random()H(), bot.color, bot.name);
+      const nb = createPlayer(Math.random()*W(), Math.random()*H(), bot.color, bot.name);
       nb.elo = bot.elo; nb.points = bot.points; nb.lastChange = bot.lastChange;
       players.push(nb);
     }
@@ -1126,7 +1106,7 @@ function startGame(selectedMode) {
 }
 
 function hideAllScreensForGame() {
-  ALLSCREENS.forEach(s => {
+  ALL_SCREENS.forEach(s => {
     const el = document.getElementById(s);
     if (el) el.style.display = "none";
   });
@@ -1144,23 +1124,23 @@ function startTournament() {
   participants.push(me);
 
   // Distribute skills evenly
-  const skillList = Array.from({length: aiBotCount}, (,i) => (i+1)/aiBotCount);
+  const skillList = Array.from({length: aiBotCount}, (_,i) => (i+1)/aiBotCount);
   for (let i = skillList.length-1; i > 0; i--) {
-    const j = Math.floor(Math.random()  (i+1));
+    const j = Math.floor(Math.random() * (i+1));
     [skillList[i], skillList[j]] = [skillList[j], skillList[i]];
   }
 
   for (let i = 0; i < aiBotCount; i++) {
     const s   = skillList[i];
-    const bot = createPlayer(Math.random()W(), Math.random()H(),
-      hsl(${i360/aiBotCount},100%,50%), "Bot "+(i+1));
+    const bot = createPlayer(Math.random()*W(), Math.random()*H(),
+      `hsl(${i*360/aiBotCount},100%,50%)`, "Bot "+(i+1));
     // Override skill with uniform number for tournament
     bot.skill      = { aim:s, reaction:s, movement:s, awareness:s, aggression:s };
-    bot.speed      = 1.5  + s  8;
-    bot.reaction   = 2    + s  6;
-    bot.awareness  = 60   + s  100;
-    bot.dodgePower = 0.5  + s  3.5;
-    bot.randomness = (1-s)  4;
+    bot.speed      = 1.5  + s * 8;
+    bot.reaction   = 2    + s * 6;
+    bot.awareness  = 60   + s * 100;
+    bot.dodgePower = 0.5  + s * 3.5;
+    bot.randomness = (1-s) * 4;
     participants.push(bot);
   }
 
@@ -1217,8 +1197,8 @@ function resetAIState(p) {
 function setupMatch(match) {
   const [p1, p2] = match.players;
   for (const p of match.players) { resetAIState(p); p.alive = true; }
-  p1.x = W()/2 - W()0.25; p1.y = H()0.5;
-  p2.x = W()/2 + W()0.25; p2.y = H()0.5;
+  p1.x = W()/2 - W()*0.25; p1.y = H()*0.5;
+  p2.x = W()/2 + W()*0.25; p2.y = H()*0.5;
   match.balls = []; match.lastSpawn = Date.now(); match.spawnDelay = spawnDelay;
   for (let i = 0; i < startBallCount; i++) createBallForMatch(match);
   if (!spectateModeActive) {
@@ -1309,7 +1289,7 @@ function update() {
       for (let i = coins.length - 1; i >= 0; i--) {
         const c = coins[i];
         const dx = p.x - c.x, dy = p.y - c.y;
-        if (Math.sqrt(dxdx + dydy) < p.radius + c.r) {
+        if (Math.sqrt(dx*dx + dy*dy) < p.radius + c.r) {
           if (p.name === "Player") {
             coinScorePlayer += c.value;
             document.getElementById("coinScore").textContent = coinScorePlayer;
@@ -1351,7 +1331,7 @@ function updateMatch(match) {
     if (!p.alive) continue;
     for (const b of match.balls) {
       const dx = p.x - b.x, dy = p.y - b.y;
-      if (Math.sqrt(dxdx + dydy) < p.radius + b.radius) {
+      if (Math.sqrt(dx*dx + dy*dy) < p.radius + b.radius) {
         p.alive = false;
         const alive = match.players.filter(x => x.alive);
         if (alive.length <= 1) {
@@ -1368,7 +1348,7 @@ function checkCollision(p) {
   if (!p.alive) return;
   for (const b of balls) {
     const dx = p.x - b.x, dy = p.y - b.y;
-    if (Math.sqrt(dxdx + dydy) < p.radius + b.radius) {
+    if (Math.sqrt(dx*dx + dy*dy) < p.radius + b.radius) {
       p.alive = false;
       p.deathTime = Date.now();
       eliminated.push(p);
@@ -1451,7 +1431,7 @@ function finishMatch(match, winner, loser) {
       waitingQueue.push(loser);
     }
     seededMatchmaking();
-  }, 2500 + Math.random()  1500);
+  }, 2500 + Math.random() * 1500);
 }
 
 function finishArena() {
@@ -1478,7 +1458,7 @@ function finishArena() {
         let b = ranking.find(x => x.name === eliminated[j].name);
         if (!b) { b = { name:eliminated[j].name, color:eliminated[j].color, points:0, elo:1500, lastChange:0 }; ranking.push(b); }
         const eA = 1 / (1 + Math.pow(10, (b.elo - a.elo) / 400));
-        const cA = K  (1 - eA), cB = K  (0 - (1-eA));
+        const cA = K * (1 - eA), cB = K * (0 - (1-eA));
         a.elo += cA; b.elo += cB; a.lastChange += cA; b.lastChange += cB;
       }
     }
@@ -1487,7 +1467,7 @@ function finishArena() {
   updateRanking();
   const win = eliminated[0];
   showScreen("gameOver");
-  document.getElementById("finalTime").innerHTML = Round ${currentRound}/${tournamentRounds}<br>Winner: ${win?.name || "?"};
+  document.getElementById("finalTime").innerHTML = `Round ${currentRound}/${tournamentRounds}<br>Winner: ${win?.name || "?"}`;
   if (currentRound < tournamentRounds) {
     currentRound++;
     setTimeout(() => { document.getElementById("gameOver").style.display="none"; startGame(mode); }, 15000);
@@ -1506,8 +1486,8 @@ function updateRanking() {
   let html = "<b>TOURNAMENT RANKING</b><br><br>";
   for (let i = 0; i < sorted.length; i++) {
     html += rankingMode === "elo"
-      ? ${i+1}. ${sorted[i].name} | ${Math.round(sorted[i].elo)} ELO (${sorted[i].lastChange>=0?"+":""}${Math.round(sorted[i].lastChange)})<br>
-      : ${i+1}. ${sorted[i].name} | ${sorted[i].points} Points<br>;
+      ? `${i+1}. ${sorted[i].name} | ${Math.round(sorted[i].elo)} ELO (${sorted[i].lastChange>=0?"+":""}${Math.round(sorted[i].lastChange)})<br>`
+      : `${i+1}. ${sorted[i].name} | ${sorted[i].points} Points<br>`;
   }
   document.getElementById("ranking").innerHTML = html;
 }
@@ -1522,14 +1502,14 @@ function updateEloTable() {
     const p      = sorted[i];
     const active = matches.some(m => m.running && m.players.includes(p));
     const isSpec = p.name === "YOU" && humanRemovedFromQueue;
-    html += <div data-pname="${p.name}" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;padding:3px;border-radius:6px;"
+    html += `<div data-pname="${p.name}" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;padding:3px;border-radius:6px;"
       onmouseover="this.style.background='rgba(255,255,255,0.1)'"
       onmouseout="this.style.background=''"
       onclick="openProfile('${p.name}')">
       <div style="width:12px;height:12px;border-radius:50%;background:${isSpec?"#aaa":active?"lime":"red"};flex-shrink:0;"></div>
       <div>${i+1}. <b style="color:${p.color||'white'}">${p.name}</b>${isSpec?" 👁":""}<br>
         ${Math.round(p.elo)} <span style="color:${p.lastChange>=0?"lime":"red"}">(${p.lastChange>=0?"+":""}${Math.round(p.lastChange)})</span>
-      </div></div>;
+      </div></div>`;
   }
   const me = participants.find(p => p.name === "YOU");
   if (me) {
@@ -1550,13 +1530,13 @@ function openProfile(name) {
   if (!p) return;
   const sorted  = [...participants].sort((a,b) => b.elo - a.elo);
   const rank    = sorted.findIndex(x => x.name === name) + 1;
-  const winrate = p.stats.matchesPlayed > 0 ? Math.round(p.stats.wins / p.stats.matchesPlayed  100) : 0;
+  const winrate = p.stats.matchesPlayed > 0 ? Math.round(p.stats.wins / p.stats.matchesPlayed * 100) : 0;
   const inMatch = matches.some(m => m.running && m.players.includes(p));
   const opp     = inMatch ? matches.find(m => m.running && m.players.includes(p))?.players.find(x => x.name !== name) : null;
-  const skillVal = Math.round(getSkillValue(p)  100);
+  const skillVal = Math.round(getSkillValue(p) * 100);
 
-  document.getElementById("profileName").innerHTML = <span style="color:${p.color}">${p.name}</span>;
-  document.getElementById("profileStats").innerHTML = 
+  document.getElementById("profileName").innerHTML = `<span style="color:${p.color}">${p.name}</span>`;
+  document.getElementById("profileStats").innerHTML = `
     <div class="prof-row"><span class="prof-label">Rank</span><span class="prof-val">#${rank} / ${participants.length}</span></div>
     <div class="prof-row"><span class="prof-label">ELO</span><span class="prof-val">${Math.round(p.elo)}</span></div>
     <div class="prof-row"><span class="prof-label">Skill</span><span class="prof-val">${skillVal}%</span></div>
@@ -1570,7 +1550,7 @@ function openProfile(name) {
     <div class="prof-row"><span class="prof-label">Status</span><span class="prof-val">${inMatch?"⚔️ vs "+opp?.name:"⏳ Waiting"}</span></div>
     <div class="prof-row"><span class="prof-label">Speed</span><span class="prof-val">${p.speed.toFixed(1)}</span></div>
     <div class="prof-row"><span class="prof-label">Awareness</span><span class="prof-val">${Math.round(p.awareness)}px</span></div>
-  ;
+  `;
   document.getElementById("profileModal").style.display = "flex";
 }
 function closeProfile() { document.getElementById("profileModal").style.display = "none"; }
@@ -1591,7 +1571,7 @@ function autoFollowSpectate() {
     if (m) spectateMatchId = m.id;
   }
 }
-function pickRandomMatch() { const live = matches.filter(m=>m.running); if(live.length) spectateMatchId = live[Math.floor(Math.random()live.length)].id; }
+function pickRandomMatch() { const live = matches.filter(m=>m.running); if(live.length) spectateMatchId = live[Math.floor(Math.random()*live.length)].id; }
 function pickBestMatch()   { let best=null,bestAvg=-1; for(const m of matches){if(!m.running)continue; const avg=(m.players[0].elo+m.players[1].elo)/2; if(avg>bestAvg){bestAvg=avg;best=m;}} if(best) spectateMatchId=best.id; }
 
 function setTVMode(m) {
@@ -1641,13 +1621,13 @@ function draw() {
 
     // Draw balls
     for (const b of renderMatch.balls) {
-      ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI2);
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2);
       ctx.fillStyle = "#ff4444"; ctx.fill();
     }
     // Draw players
     for (const p of renderMatch.players) {
       if (!p.alive) continue;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI2);
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
       ctx.fillStyle = p.color; ctx.fill();
       ctx.fillStyle = "white"; ctx.font = "14px Arial"; ctx.textAlign = "center";
       ctx.fillText(p.name, p.x, p.y - p.radius - 10);
@@ -1678,7 +1658,7 @@ function draw() {
           const oppRank = sorted.findIndex(p => p.name === opp.name) + 1;
           oppDiv.style.display = "block";
           document.getElementById("opponentText").innerHTML =
-            Opponent: <b style="color:#ffd700">${opp.name}</b><br>Rank: <b>#${oppRank}</b> of ${participants.length}<br>ELO: <b>${Math.round(opp.elo)}</b><br>Skill: <b>${Math.round(getSkillValue(opp)100)}%</b>;
+            `Opponent: <b style="color:#ffd700">${opp.name}</b><br>Rank: <b>#${oppRank}</b> of ${participants.length}<br>ELO: <b>${Math.round(opp.elo)}</b><br>Skill: <b>${Math.round(getSkillValue(opp)*100)}%</b>`;
         }
       } else { oppDiv.style.display = "none"; }
       specDiv.style.display = "none";
@@ -1686,11 +1666,11 @@ function draw() {
       oppDiv.style.display = "none";
       specDiv.style.display = "block";
       const [p1,p2] = renderMatch.players;
-      document.getElementById("spectatorText").innerHTML = 
+      document.getElementById("spectatorText").innerHTML = `
         <div style="display:flex;align-items:center;justify-content:center;gap:14px;font-size:14px;line-height:1.2;">
-          <div style="text-align:center;min-width:90px;"><b>${p1.name}</b><br>${Math.round(p1.elo)} ELO<br>${Math.round(getSkillValue(p1)100)}%</div>
+          <div style="text-align:center;min-width:90px;"><b>${p1.name}</b><br>${Math.round(p1.elo)} ELO<br>${Math.round(getSkillValue(p1)*100)}%</div>
           <div style="font-weight:bold;font-size:16px;opacity:0.8;">VS</div>
-          <div style="text-align:center;min-width:90px;"><b>${p2.name}</b><br>${Math.round(p2.elo)} ELO<br>${Math.round(getSkillValue(p2)100)}%</div>
+          <div style="text-align:center;min-width:90px;"><b>${p2.name}</b><br>${Math.round(p2.elo)} ELO<br>${Math.round(getSkillValue(p2)*100)}%</div>
         </div>`;
     }
     return;
@@ -1699,7 +1679,7 @@ function draw() {
   // ── COIN MODE ──
   if (mode === "coin") {
     for (const c of coins) {
-      ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, Math.PI2);
+      ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, Math.PI*2);
       ctx.fillStyle  = c.value > 1 ? "#ffd700" : "#ffcc44";
       ctx.shadowColor = "#ffaa00"; ctx.shadowBlur = c.value > 1 ? 18 : 8;
       ctx.fill(); ctx.shadowBlur = 0;
@@ -1712,14 +1692,14 @@ function draw() {
 
   // ── BALLS ──
   for (const b of balls) {
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI2);
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2);
     ctx.fillStyle = "#ff4444"; ctx.fill();
   }
 
   // ── PLAYERS ──
   for (const p of players) {
     if (!p.alive) continue;
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI2);
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
     ctx.fillStyle = p.color; ctx.fill();
 
     if (mode === "mirror" && p.name === "Mirror") {
