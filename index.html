@@ -2012,12 +2012,22 @@ canvas.addEventListener("mousemove", e => {
 });
 
 // Fix: use getBoundingClientRect for correct coordinates on all devices including iPhone
+// ═══════════════════════════════════════════════
+//  CONTROLS — Event-Listener angepasst auf Skalierung
+// ═══════════════════════════════════════════════
+canvas.addEventListener("mousemove", e => {
+  if (running && ["single","tournament","coin","mirror","online","survival"].includes(mode)) {
+    const pos = screenToVirtual(e.clientX, e.clientY);
+    moveSingle(pos.x, pos.y);
+  }
+});
+
 canvas.addEventListener("touchmove", e => {
   e.preventDefault();
   if (!running) return;
   if (!["single","tournament","coin","mirror","online","survival"].includes(mode)) return;
   const touch = e.touches[0];
-  const pos   = getTouchPos(touch);
+  const pos   = screenToVirtual(touch.clientX, touch.clientY);
   moveSingle(pos.x, pos.y);
 }, { passive: false });
 
@@ -2026,9 +2036,10 @@ canvas.addEventListener("touchstart", e => {
   if (!running) return;
   if (!["single","tournament","coin","mirror","online","survival"].includes(mode)) return;
   const touch = e.touches[0];
-  const pos   = getTouchPos(touch);
+  const pos   = screenToVirtual(touch.clientX, touch.clientY);
   moveSingle(pos.x, pos.y);
 }, { passive: false });
+
 </script>
 </body>
 </html>
