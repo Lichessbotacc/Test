@@ -782,65 +782,49 @@ function getSkillValue(p) {
 
 function updateAI(p, activeBalls) {
   if (!p.alive) return;
-  const skill      = getSkillValue(p);
-  const inaccuracy = 1 - skill;
-  if (Math.random() < inaccuracy * 0.04) return;
-
   let danger = false;
   for (const b of activeBalls) {
     const dx = p.x - b.x, dy = p.y - b.y;
-    if (Math.sqrt(dx*dx + dy*dy) < (p.awareness || 100)) { danger = true; break; }
+    if (Math.sqrt(dx*dx + dy*dy) < p.awareness) { danger = true; break; }
   }
-
   if (!danger) {
-    if (p.targetX === null || p.targetY === null || Math.random() < 0.015 + inaccuracy * 0.05) {
+    if (p.targetX === null || p.targetY === null || Math.random() < 0.02) {
       p.targetX = Math.random() * W();
       p.targetY = Math.random() * H();
     }
   }
-
   let moveX = (p.targetX || W()/2) - p.x;
   let moveY = (p.targetY || H()/2) - p.y;
-  moveX += (Math.random() - 0.5) * 120 * inaccuracy;
-  moveY += (Math.random() - 0.5) * 120 * inaccuracy;
   const moveDist = Math.sqrt(moveX*moveX + moveY*moveY) || 1;
   moveX /= moveDist; moveY /= moveDist;
-
   let avoidX = 0, avoidY = 0;
   const wallMargin = 140;
   if (p.x < wallMargin)        avoidX += (wallMargin - p.x) * 0.03;
   if (p.x > W()-wallMargin)    avoidX -= (p.x - (W()-wallMargin)) * 0.03;
   if (p.y < wallMargin)        avoidY += (wallMargin - p.y) * 0.03;
   if (p.y > H()-wallMargin)    avoidY -= (p.y - (H()-wallMargin)) * 0.03;
-
   for (const b of activeBalls) {
-    const dx   = p.x - b.x, dy = p.y - b.y;
+    const dx = p.x - b.x, dy = p.y - b.y;
     const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-    const aw   = p.awareness || 100;
-    if (dist < aw) {
-      const strength = Math.max(0, (aw - dist) / aw);
-      const force    = strength * (p.dodgePower || 1) * (0.7 + skill * 0.6);
+    if (dist < p.awareness) {
+      const strength = Math.max(0, (p.awareness - dist) / p.awareness);
+      const force = strength * p.dodgePower * 2;
       avoidX += (dx / dist) * force;
       avoidY += (dy / dist) * force;
     }
   }
-
-  p.aiVX = p.aiVX || 0;
-  p.aiVY = p.aiVY || 0;
-  const steering = 0.08 + skill * 0.18;
-  p.aiVX += (moveX * 4 + avoidX * 10 - p.aiVX) * steering;
-  p.aiVY += (moveY * 4 + avoidY * 10 - p.aiVY) * steering;
-  p.aiVX += (Math.random() - 0.5) * (p.randomness || 2) * 0.6;
-  p.aiVY += (Math.random() - 0.5) * (p.randomness || 2) * 0.6;
-
-  const len = Math.sqrt(p.aiVX*p.aiVX + p.aiVY*p.aiVY) || 1;
-  p.x += (p.aiVX / len) * (p.speed || 2);
-  p.y += (p.aiVY / len) * (p.speed || 2);
+  let vx = moveX * 4 + avoidX * 10;
+  let vy = moveY * 4 + avoidY * 10;
+  vx += (Math.random() - 0.5) * p.randomness;
+  vy += (Math.random() - 0.5) * p.randomness;
+  const len = Math.sqrt(vx*vx + vy*vy) || 1;
+  p.x += (vx / len) * p.speed;
+  p.y += (vy / len) * p.speed;
   p.x = Math.max(p.radius, Math.min(W()-p.radius, p.x));
   p.y = Math.max(p.radius, Math.min(H()-p.radius, p.y));
-  p.lastVX = p.aiVX;
-  p.lastVY = p.aiVY;
+  p.lastVX = vx; p.lastVY = vy;
 }
+
 
 // ═══════════════════════════════════════════════
 //  PLAYER FACTORY
@@ -853,31 +837,23 @@ function createPlayer(x, y, color, name) {
     awareness:  Math.random(),
     aggression: Math.random()
   };
-  const avg      = (skill.aim + skill.reaction + skill.movement + skill.awareness + skill.aggression) / 5;
-  const balanced = 0.5 + (avg - 0.5) * 0.9;
   return {
-    x, y,
-    radius:     playerRadiusSetting,
-    color, name, skill,
-    points:     0,
-    elo:        1500,
-    lastChange: 0,
-    alive:      true,
-    games:      0,
-    speed:      1.0 + balanced * 1.2,
-    reaction:   0.25 + balanced * 1.0,
-    awareness:  70   + balanced * 90,
-    randomness: (1 - balanced) * 4.0,
-    dodgePower: 0.4  + balanced * 1.6,
-    targetX:    null,
-    targetY:    null,
+    x, y, radius: playerRadiusSetting, color, name,
+    points: 0, elo: 1500, lastChange: 0, alive: true, games: 0,
+    skill,
+    speed:      2 + skill.movement * 8 + skill.aggression * 2,
+    reaction:   0.3 + skill.reaction * 4,
+    awareness:  60  + skill.awareness * 140,
+    randomness: (1 - skill.movement) * 5,
+    dodgePower: 0.5 + skill.aim * 3 + skill.reaction * 1.5,
+    targetX: null, targetY: null,
     lastVX: 0, lastVY: 0,
-    aiVX: 0,   aiVY: 0,
-    arenaScore: 0,
-    deathTime:  0,
+    aiVX: 0, aiVY: 0,
+    arenaScore: 0, deathTime: 0,
     stats: { wins:0, losses:0, totalEloGain:0, totalEloLoss:0, matchesPlayed:0, bestStreak:0, currentStreak:0 }
   };
 }
+
 
 // ═══════════════════════════════════════════════
 //  BALLS
