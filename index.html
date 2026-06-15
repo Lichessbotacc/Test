@@ -287,69 +287,49 @@ input[type=text],input[type=number]{
 
 <script>
 // ═══════════════════════════════════════════════
-//  CANVAS & RESIZE
 // ═══════════════════════════════════════════════
-// =====================
-// VIRTUAL WORLD (FIX)
-// =====================
-const V_W = 1024;
-const V_H = 768;
-let scale = 1;
+//  CANVAS & RESIZE (Feste Höhe, variable Breite)
+// ═══════════════════════════════════════════════
+const canvas = document.getElementById("game"); // Korrigiert von gameCanvas auf game
+const ctx    = canvas.getContext("2d");
 
-// Canvas & Context (müssen vorher existieren)
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+const V_H = 768;  // Feste iPad-Referenzhöhe im Querformat
+let V_W   = 1024; // Virtuelle Breite (wird dynamisch angepasst)
+let scale = 1;
 
 function W() { return V_W; }
 function H() { return V_H; }
 
-
-// =====================
-// RESIZE (UNIFIED SCALE)
-// =====================
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
 
-  // Wichtig: immer gleiche Welt, nur skalieren
-  scale = Math.min(
-    screenW / V_W,
-    screenH / V_H
-  );
+  // Skaliere alles basierend auf der tatsächlichen Bildschirmhöhe
+  scale = screenH / V_H;
+  V_W   = screenW / scale; // Die Breite passt sich dynamisch an (keine schwarzen Balken)
 
-  // Canvas volle Bildschirmgröße
-  canvas.style.width = screenW + "px";
+  canvas.style.width  = screenW + "px";
   canvas.style.height = screenH + "px";
+  canvas.width  = Math.round(screenW * dpr);
+  canvas.height = Math.round(screenH * dpr);
 
-  canvas.width = Math.floor(screenW * dpr);
-  canvas.height = Math.floor(screenH * dpr);
-
-  // Reset + DPR fix + Skalierung der Welt
+  // Transformation zurücksetzen, DPR anwenden und Skalierung der Welt vornehmen
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.scale(scale, scale);
 }
 
-
-// =====================
-// INPUT (TOUCH / MOUSE FIX)
-// =====================
 function screenToVirtual(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
-
   return {
     x: (clientX - rect.left) / scale,
     y: (clientY - rect.top) / scale
   };
 }
 
-
-// =====================
-// INIT
-// =====================
 window.addEventListener("resize", resize);
 resize();
+
 
 // ═══════════════════════════════════════════════
 //  ROUNDRECT POLYFILL
