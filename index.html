@@ -593,6 +593,25 @@ async function cleanStaleMatches() {
     }
   } catch(e) {}
 }
+async function acceptInvite(data) {
+  if (onlineMatchId) return;
+  
+  const matchData = await dbGet("onlineMatches/" + data.matchId);
+  if (!matchData) return;
+
+  if (onlineSearchInterval) {
+    clearInterval(onlineSearchInterval);
+    onlineSearchInterval = null;
+  }
+
+  const opp = { name: data.opp, elo: data.oppElo };
+
+  // Eigene Queue- und Einladungsdaten aus der DB löschen
+  await dbRemove("queue/" + onlineAccount.name + "_invite");
+  await dbRemove("queue/" + onlineAccount.name);
+
+  joinMatch(data.matchId, opp, matchData);
+}
 
 async function startSearchingOnline() {
   if (!fbReady) {
@@ -635,13 +654,10 @@ async function tryMatchmake() {
 
   others.sort((a,b) => Math.abs(a.elo - onlineAccount.elo) - Math.abs(b.elo - onlineAccount.elo));
   const opp     = others[0];
-  // Canonical match ID (alphabetical) so both see the same key
   const matchId = [onlineAccount.name, opp.name].sort().join("__VS__");
 
-  // Check if match already created (by the other player)
   const existing = await dbGet("onlineMatches/" + matchId);
   if (existing && existing.status === "waiting") {
-    // Match was created by opp, we join as p2
     if (onlineMatchId) return;
     await dbRemove("queue/" + onlineAccount.name);
     joinMatch(matchId, opp, existing);
@@ -649,7 +665,6 @@ async function tryMatchmake() {
   }
   if (existing && existing.status !== "done" && existing.status !== "abandoned") return;
 
-  // We create the match as host (p1)
   const p1Name = onlineAccount.name < opp.name ? onlineAccount.name : opp.name;
   const p2Name = onlineAccount.name < opp.name ? opp.name : onlineAccount.name;
   const isP1   = onlineAccount.name === p1Name;
@@ -661,7 +676,6 @@ async function tryMatchmake() {
     status: "waiting",
     winner: null,
     createdAt: Date.now(),
-    // Seed for ball RNG so both clients reproduce the same balls
     seed: Math.floor(Math.random() * 1000000),
     ballSpeedMult: ballSpeedMultiplier,
     startBalls: startBallCount
@@ -669,18 +683,25 @@ async function tryMatchmake() {
   try {
     const existing = await dbGet("onlineMatches/" + matchId);
 
-if (!existing) {
-  await dbSet("onlineMatches/" + matchId, matchData);
-} else {
-  return; // Match wurde schon erstellt
-}
+    if (!existing) {
+      await dbSet("onlineMatches/" + matchId, matchData);
+    } else {
+      return; 
+    }
+
+    // NEU: Einladung für den Gegner in Firebase hinterlegen
+    await dbSet("queue/" + opp.name + "_invite", {
+      matchId: matchId,
+      opp: onlineAccount.name,
+      oppElo: onlineAccount.elo
+    });
+
     await dbRemove("queue/" + onlineAccount.name);
     await dbRemove("queue/" + opp.name);
+    
     joinMatch(matchId, opp, matchData);
   } catch(e) {
-    console.warn("Match creation race:", e);
-  }
-}
+    console.warn("No response
 
 function joinMatch(matchId, opp, matchData) {
   if (onlineMatchId) return;
