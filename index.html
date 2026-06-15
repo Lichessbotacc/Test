@@ -681,15 +681,16 @@ async function tryMatchmake() {
     startBalls: startBallCount
   };
   try {
-    const existing = await dbGet("onlineMatches/" + matchId);
+    const existingCheck = await dbGet("onlineMatches/" + matchId);
 
-    if (!existing) {
+    // KORREKTUR: Überschreiben erlauben, wenn das alte Spiel vorbei ist
+    if (!existingCheck || existingCheck.status === "done" || existingCheck.status === "abandoned") {
       await dbSet("onlineMatches/" + matchId, matchData);
     } else {
       return; 
     }
 
-    // NEU: Einladung für den Gegner in Firebase hinterlegen
+    // Einladung für den Gegner hinterlegen
     await dbSet("queue/" + opp.name + "_invite", {
       matchId: matchId,
       opp: onlineAccount.name,
@@ -699,11 +700,8 @@ async function tryMatchmake() {
     await dbRemove("queue/" + onlineAccount.name);
     await dbRemove("queue/" + opp.name);
     
-    joinMatch(matchId, opp, matchData);
-  } catch(e) {
-    console.warn("No response or match creation race:", e);
-  }
-}
+    joinMatchNo response
+
 
 
 function joinMatch(matchId, opp, matchData) {
