@@ -339,7 +339,13 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 // ═══════════════════════════════════════════════
 let fbReady = false;
 window.addEventListener("firebaseReady", () => { fbReady = true; });
+window.addEventListener("firebaseReady", async () => {
+  fbReady = true;
 
+  if (onlineAccount) {
+    await pushAccountToFirebase();
+  }
+});
 function dbRef(path)           { return window._firebaseRef(window._firebaseDB, path); }
 async function dbGet(path)     { return (await window._firebaseGet(dbRef(path))).val(); }
 async function dbSet(path, v)  { return window._firebaseSet(dbRef(path), v); }
