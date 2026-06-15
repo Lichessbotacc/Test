@@ -289,47 +289,67 @@ input[type=text],input[type=number]{
 // ═══════════════════════════════════════════════
 //  CANVAS & RESIZE
 // ═══════════════════════════════════════════════
-const canvas = document.getElementById("game");
-const ctx    = canvas.getContext("2d");
-
-function resize() {
-  const dpr = window.devicePixelRatio || 1;
-  const screenW = window.innerWidth;
-  const screenH = window.innerHeight;
-
-  // Berechne Skalierungsfaktor basierend auf der aktuellen Bildschirmhöhe
-  scale = screenH / V_H;
-  V_W = screenW / scale; // Berechne die virtuelle Breite dynamisch
-
-  canvas.style.width  = screenW + "px";
-  canvas.style.height = screenH + "px";
-  canvas.width  = Math.round(screenW * dpr);
-  canvas.height = Math.round(screenH * dpr);
-
-  // Transformation zurücksetzen und Skalierung anwenden (ohne Verschiebung!)
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.scale(scale, scale);
-}
-
-
-
-const V_H = 768;  // Feste iPad-Referenzhöhe im Querformat
-let V_W = 1024;   // Wird beim Resize dynamisch berechnet
+// =====================
+// VIRTUAL WORLD (FIX)
+// =====================
+const V_W = 1024;
+const V_H = 768;
 let scale = 1;
+
+// Canvas & Context (müssen vorher existieren)
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
 function W() { return V_W; }
 function H() { return V_H; }
 
 
-// Fix: touch coords — use clientX/Y directly (CSS pixels), no DPR needed
+// =====================
+// RESIZE (UNIFIED SCALE)
+// =====================
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+
+  const screenW = window.innerWidth;
+  const screenH = window.innerHeight;
+
+  // Wichtig: immer gleiche Welt, nur skalieren
+  scale = Math.min(
+    screenW / V_W,
+    screenH / V_H
+  );
+
+  // Canvas volle Bildschirmgröße
+  canvas.style.width = screenW + "px";
+  canvas.style.height = screenH + "px";
+
+  canvas.width = Math.floor(screenW * dpr);
+  canvas.height = Math.floor(screenH * dpr);
+
+  // Reset + DPR fix + Skalierung der Welt
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.scale(scale, scale);
+}
+
+
+// =====================
+// INPUT (TOUCH / MOUSE FIX)
+// =====================
 function screenToVirtual(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
+
   return {
     x: (clientX - rect.left) / scale,
     y: (clientY - rect.top) / scale
   };
 }
 
+
+// =====================
+// INIT
+// =====================
+window.addEventListener("resize", resize);
+resize();
 
 // ═══════════════════════════════════════════════
 //  ROUNDRECT POLYFILL
