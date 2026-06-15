@@ -701,7 +701,10 @@ async function tryMatchmake() {
     
     joinMatch(matchId, opp, matchData);
   } catch(e) {
-    console.warn("No response
+    console.warn("No response or match creation race:", e);
+  }
+}
+
 
 function joinMatch(matchId, opp, matchData) {
   if (onlineMatchId) return;
