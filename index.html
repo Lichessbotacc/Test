@@ -297,30 +297,25 @@ function resize() {
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
 
-  // Berechne den Skalierungsfaktor, um das Feld perfekt einzupassen
-  scale = Math.min(screenW / V_W, screenH / V_H);
-  
-  // Berechne Offsets für die Zentrierung
-  offsetX = (screenW - V_W * scale) / 2;
-  offsetY = (screenH - V_H * scale) / 2;
+  // Berechne Skalierungsfaktor basierend auf der aktuellen Bildschirmhöhe
+  scale = screenH / V_H;
+  V_W = screenW / scale; // Berechne die virtuelle Breite dynamisch
 
   canvas.style.width  = screenW + "px";
   canvas.style.height = screenH + "px";
   canvas.width  = Math.round(screenW * dpr);
   canvas.height = Math.round(screenH * dpr);
 
-  // Setze Transformation zurück, wende DPR an, verschiebe und skaliere
+  // Transformation zurücksetzen und Skalierung anwenden (ohne Verschiebung!)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.translate(offsetX, offsetY);
   ctx.scale(scale, scale);
 }
 
 
-const V_W = 1024; // Virtuelle Breite (iPad 4:3 Standard)
-const V_H = 768;  // Virtuelle Höhe
+
+const V_H = 768;  // Feste iPad-Referenzhöhe im Querformat
+let V_W = 1024;   // Wird beim Resize dynamisch berechnet
 let scale = 1;
-let offsetX = 0;
-let offsetY = 0;
 
 function W() { return V_W; }
 function H() { return V_H; }
@@ -330,10 +325,11 @@ function H() { return V_H; }
 function screenToVirtual(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
   return {
-    x: (clientX - rect.left - offsetX) / scale,
-    y: (clientY - rect.top - offsetY) / scale
+    x: (clientX - rect.left) / scale,
+    y: (clientY - rect.top) / scale
   };
 }
+
 
 // ═══════════════════════════════════════════════
 //  ROUNDRECT POLYFILL
