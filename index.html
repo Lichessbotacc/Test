@@ -1055,6 +1055,15 @@ function handleOnlineResult(winnerName, change) {
   onlineBotElo = onlineOpponent.elo;
   localStorage.setItem("onlineBotElo", onlineBotElo);
 }
+  if (fbReady) {
+  await dbSet("players/Online Bot", {
+    name: "Online Bot",
+    elo: onlineBotElo,
+    wins: 0,
+    losses: 0,
+    updatedAt: Date.now()
+  });
+}
 }
 
 function showWinnerOverlay(winnerName, eloChange) {
