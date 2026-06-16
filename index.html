@@ -878,8 +878,12 @@ function startOnlineGame(matchData) {
   const meX  = onlineRole === "p1" ? p1x : p2x;
   const oppX = onlineRole === "p1" ? p2x : p1x;
 
-  const mePlayer  = createPlayer(meX,  py, myColor,  myName);
+    const mePlayer  = createPlayer(meX,  py, myColor,  myName);
   const oppPlayer = createPlayer(oppX, py, oppColor, oppName);
+
+  // Wichtig für flüssige Interpolation des Gegners
+  oppPlayer.tx = oppX;
+  oppPlayer.ty = py;
 
   if (onlineVsBot) {
     // Weak bot: low skill stats so it's an easy fallback opponent
@@ -1028,7 +1032,7 @@ let lastPosPush = 0;
 function pushMyPosition() {
   if (!fbReady || !onlineMatchId || !running || mode !== "online" || onlineVsBot) return;
   const now = Date.now();
-  if (now - lastPosPush < 50) return;
+    if (now - lastPosPush < 40) return;   // schnelleres Update return;
   lastPosPush = now;
   const me = players.find(p => p.name === onlineAccount.name);
   if (!me) return;
@@ -1553,14 +1557,12 @@ function update() {
     pushMyPosition();
     onlineSimTick++;
 
-    // FIX #1: BOTH host and client run identical local ball spawning
-    // and physics every frame (same seed, same fixed resolution, same
-    // spawn cadence) -> motion is always smooth 60fps locally, with no
-    // dependency on receiving a network frame to move balls.
+    // Ball spawning + physics
     if (Date.now() - onlineBallSpawnTimer > ONLINE_SPAWN_MS) {
       onlineBallSpawnTimer = Date.now();
       balls.push(makeOnlineBall());
     }
+
     for (const b of balls) {
       b.x += b.vx; b.y += b.vy;
       if (b.x - b.radius < 0)   { b.vx =  Math.abs(b.vx); b.x = b.radius; }
@@ -1568,25 +1570,26 @@ function update() {
       if (b.y - b.radius < 0)   { b.vy =  Math.abs(b.vy); b.y = b.radius; }
       if (b.y + b.radius > H()) { b.vy = -Math.abs(b.vy); b.y = H()-b.radius; }
     }
+
     if (onlineIsHost && !onlineVsBot) pushBallState();
 
-       // Bot opponent: run AI + collision
+    // === ECHTER GEGNER BEWEGUNG (wie Agar.io) ===
     if (onlineVsBot) {
       const bot = players.find(p => p.name !== onlineAccount.name);
       if (bot && bot.alive) {
         updateAI(bot, balls);
-        checkBotCollision(bot);           // ← NEU: Bot kann jetzt sterben
+        checkBotCollision(bot);
       }
     } else {
-      // Interpolate opponent position smoothly from network state
-      for (const p of players) {
-        if (p.name !== onlineAccount.name && p.tx !== undefined) {
-          p.x += (p.tx - p.x) * 0.3;
-          p.y += (p.ty - p.y) * 0.3;
-        }
+      // Real opponent – flüssige Interpolation
+      const opp = players.find(p => p.name !== onlineAccount.name);
+      if (opp && opp.tx !== undefined && opp.ty !== undefined) {
+        opp.x += (opp.tx - opp.x) * 0.45;
+        opp.y += (opp.ty - opp.y) * 0.45;
       }
     }
 
+    // Eigener Spieler clampen
     const me = players.find(p => p.name === onlineAccount.name);
     if (me) {
       me.x = Math.max(me.radius, Math.min(W()-me.radius, me.x));
