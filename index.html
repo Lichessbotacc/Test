@@ -664,8 +664,8 @@ async function openOnlineProfile(name) {
       <div class="prof-row"><span class="prof-label">Longest Winstreak</span><span class="prof-val">${p.bestStreak ?? 0}</span></div>
       <div class="prof-row"><span class="prof-label">Current Winstreak</span><span class="prof-val">${p.currentStreak ?? 0}</span></div>
       
-      <div class="prof-row"><span class="prof-label">Best Win</span><span class="prof-val" style="color:#00ff88">+${p.bestWinChange ?? 0} vs ${p.bestWinOpp || "-"}</span></div>
-      <div class="prof-row"><span class="prof-label">Worst Loss</span><span class="prof-val" style="color:#ff4444">-${p.worstLossChange ?? 0} vs ${p.worstLossOpp || "-"}</span></div>
+          <div class="prof-row"><span class="prof-label">Best Win</span><span class="prof-val" style="color:#00ff88">${p.bestWinChange ?? 0} ELO vs ${p.bestWinOpp || "-"}</span></div>
+      <div class="prof-row"><span class="prof-label">Worst Loss</span><span class="prof-val" style="color:#ff4444">${p.worstLossChange ?? 0} ELO vs ${p.worstLossOpp || "-"}</span></div>
       
       <div class="prof-row"><span class="prof-label">Total Elo Won</span><span class="prof-val" style="color:#00ff88">+${p.totalEloGained ?? 0}</span></div>
       <div class="prof-row"><span class="prof-label">Total Elo Loss</span><span class="prof-val" style="color:#ff4444">-${p.totalEloLost ?? 0}</span></div>
@@ -1211,23 +1211,28 @@ async function handleOnlineResult(winnerName, change) {
   const eloChange = Math.round(change);
   const oppName   = onlineOpponent ? onlineOpponent.name : "Online Bot";
 
+  // Original ELOs merken für Best/Worst Win/Loss
+  const myOriginalElo = onlineAccount.elo;
+  const oppOriginalElo = onlineOpponent ? onlineOpponent.elo : 1500;
+
   onlineAccount = sanitizeAccount(onlineAccount);
 
   if (won) { 
     onlineAccount.elo += eloChange; 
     onlineAccount.wins++;
     onlineAccount.currentStreak++;
-    if (onlineAccount.currentStreak > onlineAccount.bestStreak) {
+    if (onlineAccount.currentStreak > (onlineAccount.bestStreak ?? 0)) {
       onlineAccount.bestStreak = onlineAccount.currentStreak;
     }
     onlineAccount.totalEloGained += eloChange;
 
-    if (onlineAccount.elo > onlineAccount.highestElo) {
+    if (onlineAccount.elo > (onlineAccount.highestElo ?? onlineAccount.elo)) {
       onlineAccount.highestElo = onlineAccount.elo;
     }
 
-    if (eloChange > onlineAccount.bestWinChange) {
-      onlineAccount.bestWinChange = eloChange;
+    // Best Win = höchste Gegner-ELO, die du geschlagen hast
+    if (oppOriginalElo > (onlineAccount.bestWinChange ?? 0)) {
+      onlineAccount.bestWinChange = oppOriginalElo;
       onlineAccount.bestWinOpp = oppName;
     }
   } else { 
@@ -1236,37 +1241,79 @@ async function handleOnlineResult(winnerName, change) {
     onlineAccount.currentStreak = 0;
     onlineAccount.totalEloLost += eloChange;
 
-    if (onlineAccount.elo < onlineAccount.lowestElo) {
+    if (onlineAccount.elo < (onlineAccount.lowestElo ?? onlineAccount.elo)) {
       onlineAccount.lowestElo = onlineAccount.elo;
     }
 
-    if (eloChange > onlineAccount.worstLossChange) {
-      onlineAccount.worstLossChange = eloChange;
+    // Worst Loss = niedrigste Gegner-ELO, gegen die du verloren hast
+    if (oppOriginalElo < (onlineAccount.worstLossChange ?? 9999)) {
+      onlineAccount.worstLossChange = oppOriginalElo;
       onlineAccount.worstLossOpp = oppName;
     }
   }
+
   saveAccountLocal();
   if (fbReady) await pushAccountToFirebase();
 
   showEloAnimation(won ? eloChange : -eloChange);
   setTimeout(() => showWinnerOverlay(winnerName, won ? eloChange : -eloChange), 2600);
 
+  // ==================== ONLINE BOT STATS ====================
   if (onlineVsBot && onlineOpponent) {
+    onlineOpponent = sanitizeAccount(onlineOpponent);
+
     if (won) {
+      // Spieler gewinnt → Bot verliert
       onlineOpponent.elo = Math.max(100, onlineOpponent.elo - eloChange);
-      if (!onlineOpponent.losses) onlineOpponent.losses = 0;
-      onlineOpponent.losses++;
+      onlineOpponent.losses = (onlineOpponent.losses ?? 0) + 1;
+      onlineOpponent.currentStreak = 0;
+      onlineOpponent.totalEloLost = (onlineOpponent.totalEloLost ?? 0) + eloChange;
+
+      if (onlineOpponent.elo < (onlineOpponent.lowestElo ?? onlineOpponent.elo)) {
+        onlineOpponent.lowestElo = onlineOpponent.elo;
+      }
+      if (myOriginalElo < (onlineOpponent.worstLossChange ?? 9999)) {
+        onlineOpponent.worstLossChange = myOriginalElo;
+        onlineOpponent.worstLossOpp = onlineAccount.name;
+      }
     } else {
+      // Bot gewinnt → Spieler verliert
       onlineOpponent.elo += eloChange;
-      if (!onlineOpponent.wins) onlineOpponent.wins = 0;
-      onlineOpponent.wins++;
+      onlineOpponent.wins = (onlineOpponent.wins ?? 0) + 1;
+      onlineOpponent.currentStreak = (onlineOpponent.currentStreak ?? 0) + 1;
+      if (onlineOpponent.currentStreak > (onlineOpponent.bestStreak ?? 0)) {
+        onlineOpponent.bestStreak = onlineOpponent.currentStreak;
+      }
+      onlineOpponent.totalEloGained = (onlineOpponent.totalEloGained ?? 0) + eloChange;
+
+      if (onlineOpponent.elo > (onlineOpponent.highestElo ?? onlineOpponent.elo)) {
+        onlineOpponent.highestElo = onlineOpponent.elo;
+      }
+      if (myOriginalElo > (onlineOpponent.bestWinChange ?? 0)) {
+        onlineOpponent.bestWinChange = myOriginalElo;
+        onlineOpponent.bestWinOpp = onlineAccount.name;
+      }
     }
+
     onlineBotElo = onlineOpponent.elo;
     localStorage.setItem("onlineBotElo", onlineBotElo);
+
     if (fbReady) {
       await dbSet("players/Online Bot", {
-        name: "Online Bot", elo: onlineBotElo,
-        wins: onlineOpponent.wins || 0, losses: onlineOpponent.losses || 0,
+        name: "Online Bot",
+        elo: onlineBotElo,
+        wins: onlineOpponent.wins ?? 0,
+        losses: onlineOpponent.losses ?? 0,
+        highestElo: onlineOpponent.highestElo ?? onlineBotElo,
+        lowestElo: onlineOpponent.lowestElo ?? onlineBotElo,
+        currentStreak: onlineOpponent.currentStreak ?? 0,
+        bestStreak: onlineOpponent.bestStreak ?? 0,
+        totalEloGained: onlineOpponent.totalEloGained ?? 0,
+        totalEloLost: onlineOpponent.totalEloLost ?? 0,
+        bestWinChange: onlineOpponent.bestWinChange ?? 0,
+        bestWinOpp: onlineOpponent.bestWinOpp ?? "",
+        worstLossChange: onlineOpponent.worstLossChange ?? 0,
+        worstLossOpp: onlineOpponent.worstLossOpp ?? "",
         updatedAt: Date.now()
       });
     }
