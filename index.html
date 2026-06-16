@@ -749,13 +749,21 @@ async function tryMatchmake() {
 }
 
 // FIX #3: weak AI bot fallback opponent after 30s of searching
+// FIX #3: weak AI bot fallback opponent after 30s of searching
 function startBotMatch() {
   if (onlineMatchId) return;
-  if (onlineSearchInterval) { clearInterval(onlineSearchInterval); onlineSearchInterval = null; }
+  if (onlineSearchInterval) { 
+    clearInterval(onlineSearchInterval); 
+    onlineSearchInterval = null; 
+  }
+  if (onlineBotMatchTimeout) { 
+    clearTimeout(onlineBotMatchTimeout); 
+    onlineBotMatchTimeout = null; 
+  }
 
   dbRemove("queue/" + onlineAccount.name).catch(() => {});
 
-    onlineVsBot    = true;
+  onlineVsBot    = true;
   onlineMatchId  = "BOT__" + Date.now();
   onlineRole     = "p1";
   onlineIsHost   = true;
@@ -766,9 +774,17 @@ function startBotMatch() {
   };
   onlineResultHandled = false;
   onlineBotElo = parseInt(localStorage.getItem("onlineBotElo")) || 1500;
-  showVSScreen(onlineAccount.name, onlineAccount.elo, botName, onlineOpponent.elo, () => {
-    startOnlineGame({ seed: Math.floor(Math.random()*1000000) });
-  });
+
+  // WICHTIG: Hier immer "Online Bot" als Namen verwenden
+  showVSScreen(
+    onlineAccount.name, 
+    onlineAccount.elo, 
+    "Online Bot", 
+    onlineOpponent.elo, 
+    () => {
+      startOnlineGame({ seed: Math.floor(Math.random()*1000000) });
+    }
+  );
 }
 
 function joinMatch(matchId, opp, matchData) {
