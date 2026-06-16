@@ -1570,10 +1570,13 @@ function update() {
     }
     if (onlineIsHost && !onlineVsBot) pushBallState();
 
-    // Bot opponent: run simple AI locally (no network)
+       // Bot opponent: run AI + collision
     if (onlineVsBot) {
       const bot = players.find(p => p.name !== onlineAccount.name);
-      if (bot && bot.alive) updateAI(bot, balls);
+      if (bot && bot.alive) {
+        updateAI(bot, balls);
+        checkBotCollision(bot);           // ← NEU: Bot kann jetzt sterben
+      }
     } else {
       // Interpolate opponent position smoothly from network state
       for (const p of players) {
@@ -1593,7 +1596,6 @@ function update() {
     if (me && me.alive) checkOnlineCollision(me);
     return;
   }
-
   // ── Multi ──
   if (mode === "multi") {
     const p1 = players[0], p2 = players[1];
@@ -1671,7 +1673,27 @@ function checkOnlineCollision(me) {
     }
   }
 }
-
+// Bot collision in vs Bot mode
+// Bot collision in vs Bot mode
+function checkBotCollision(bot) {
+  for (const b of balls) {
+    const dx = bot.x - b.x;
+    const dy = bot.y - b.y;
+    if (Math.sqrt(dx*dx + dy*dy) < bot.radius + b.radius) {
+      bot.alive = false;
+      const me = players.find(p => p.name === onlineAccount.name);
+      
+      if (me && me.alive) {
+        // Gleiche ELO-Berechnung wie bei echten Gegnern
+        const diff   = Math.abs(onlineAccount.elo - (onlineOpponent?.elo || 1500));
+        const change = Math.max(1, Math.min(15, Math.round(5 + diff / 100)));
+        
+        handleOnlineResult(me.name, change);
+      }
+      return;
+    }
+  }
+}
 function updateTournament() {
   for (const match of [...matches]) {
     if (match.running) updateMatch(match);
