@@ -904,7 +904,7 @@ function startOnlineGame(matchData) {
 
   if (onlineVsBot) {
     // Weak bot: low skill stats so it's an easy fallback opponent
-    const s = 0.30;
+    const s = 0.50;
     oppPlayer.skill      = { aim:s, reaction:s, movement:s, awareness:s, aggression:s };
     oppPlayer.speed      = 1.2 + s * 3;
     oppPlayer.awareness  = 60  + s * 80;
