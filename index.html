@@ -392,7 +392,7 @@ async function dbRemove(path)  { return window._firebaseRemove(dbRef(path)); }
 // ═══════════════════════════════════════════════
 let onlineAccount = null;
 try { onlineAccount = JSON.parse(localStorage.getItem("dobAccount") || "null"); } catch(e) {}
-
+onlineBotElo = parseInt(localStorage.getItem("onlineBotElo")) || 1500;
 function saveAccountLocal() {
   if (onlineAccount) localStorage.setItem("dobAccount", JSON.stringify(onlineAccount));
 }
@@ -762,9 +762,13 @@ function startBotMatch() {
   onlineMatchId  = "BOT__" + Date.now();
   onlineRole     = "p1";
   onlineIsHost   = true;
-  onlineOpponent = { name: botName, elo: Math.max(800, onlineAccount.elo - 150), skill: 0.30 };
+  onlineOpponent = {
+  name: "Online Bot",
+  elo: onlineBotElo,
+  skill: 0.30
+};
   onlineResultHandled = false;
-
+  onlineBotElo = parseInt(localStorage.getItem("onlineBotElo")) || 1500;
   showVSScreen(onlineAccount.name, onlineAccount.elo, botName, onlineOpponent.elo, () => {
     startOnlineGame({ seed: Math.floor(Math.random()*1000000) });
   });
@@ -1047,6 +1051,10 @@ function handleOnlineResult(winnerName, change) {
 
   showEloAnimation(won ? eloChange : -eloChange);
   setTimeout(() => showWinnerOverlay(winnerName, won ? eloChange : -eloChange), 2600);
+  if (onlineVsBot && onlineOpponent) {
+  onlineBotElo = onlineOpponent.elo;
+  localStorage.setItem("onlineBotElo", onlineBotElo);
+}
 }
 
 function showWinnerOverlay(winnerName, eloChange) {
