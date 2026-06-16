@@ -45,8 +45,19 @@ try {
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{overflow:hidden;background:#111;font-family:Arial,sans-serif;}
-canvas{display:block;touch-action:none;-webkit-user-select:none;user-select:none;}
+html,body{overflow:hidden;background:#000;font-family:Arial,sans-serif;width:100%;height:100%;}
+#stage{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:#111;
+}
+#gameWrap{
+  position:absolute;inset:0;background:#111;overflow:hidden;
+}
+canvas{
+  display:block;touch-action:none;-webkit-user-select:none;user-select:none;
+  width:100%;height:100%;
+}
+
 
 #ui{position:absolute;top:20px;left:20px;color:white;font-size:20px;font-weight:bold;pointer-events:none;z-index:10;}
 button{padding:15px 35px;font-size:22px;border:none;border-radius:12px;cursor:pointer;margin:10px;background:#333;color:#fff;transition:background .2s;}
@@ -155,146 +166,157 @@ input[type=text],input[type=number]{
 </head>
 <body>
 
-<button id="homeBtn" onclick="confirmHome()">🏠 Home</button>
+<div id="stage">
+  <div id="gameWrap">
+    <button id="homeBtn" onclick="confirmHome()">🏠 Home</button>
 
-<div id="ui">
-  Time: <span id="time">0</span>s<br>
-  Record: <span id="record">0</span>s<br>
-  Balls: <span id="balls">0</span><br>
-  Mode: <span id="mode">-</span>
-</div>
-
-<div id="eloTable">
-  <b>ELO LIVE</b>
-  <div id="eloList"></div>
-  <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
-    <button style="font-size:13px;padding:6px 10px;" onclick="setTVMode('best')">BEST TV</button>
-    <button style="font-size:13px;padding:6px 10px;" onclick="setTVMode('random')">RANDOM TV</button>
-    <button style="font-size:13px;padding:6px 10px;" onclick="setTVMode('target')">TARGET TV</button>
-    <button style="font-size:13px;padding:6px 10px;" onclick="resumePlay()">▶ RESUME</button>
-  </div>
-</div>
-
-<div id="menu">
-  <h1>DarkOnBalls</h1>
-  <button onclick="showScreen('onlineFlow')">🌐 Online 1v1</button>
-  <button onclick="startGame('single')">Singleplayer</button>
-  <button onclick="startGame('multi')">Multiplayer (local)</button>
-  <button onclick="startGame('ai')">AI Spectate</button>
-  <button onclick="startGame('tournament')">1vs1 Tournament</button>
-  <button onclick="startGame('coin')">🪙 Coin Hunt</button>
-  <button onclick="startGame('survival')">💀 Survival Gauntlet</button>
-  <button onclick="startGame('mirror')">🪞 Mirror Duel</button>
-  <button onclick="showScreen('leaderboardScreen');loadLeaderboard()">🏆 Leaderboard</button>
-  <button onclick="openSettings()">Settings</button>
-</div>
-
-<div id="settings">
-  <h2>Settings</h2>
-  <label>Start Balls</label>
-  <input id="startBalls" type="number" value="3" min="1" max="20"><br><br>
-  <label>Spawn Time (s)</label>
-  <input id="spawnTime" type="number" value="5" min="1" max="30"><br><br>
-  <label>Ball Speed</label>
-  <select id="ballSpeed">
-    <option value="0.3">Slow</option>
-    <option value="0.5" selected>Normal</option>
-    <option value="0.8">Fast</option>
-    <option value="1">Extreme</option>
-  </select><br><br>
-  <label>AI Bots</label>
-  <input id="botCount" type="number" value="10" min="2"><br><br>
-  <label>Ranking System</label>
-  <select id="rankingMode">
-    <option value="points" selected>Points</option>
-    <option value="elo">ELO</option>
-  </select><br><br>
-  <button onclick="saveSettings()">Save</button>
-  <button onclick="showScreen('menu')">← Back</button>
-</div>
-
-<div id="accountScreen">
-  <h2>🌐 Online Account</h2>
-  <div id="accountContent"></div>
-</div>
-
-<div id="leaderboardScreen">
-  <h2>🏆 Online Leaderboard</h2>
-  <div id="lbTable">
-    <div class="lb-row"><span>Rank</span><span>Name</span><span>ELO</span><span>W/L</span></div>
-  </div>
-  <br><button onclick="showScreen('menu')">← Back</button>
-</div>
-
-<div id="onlineWait">
-  <h2>🌐 Online 1v1</h2>
-  <div id="onlineStatus">Searching for opponent…</div>
-  <div id="onlineSearchAnim" style="font-size:40px;margin:10px 0;">⏳</div>
-  <button onclick="cancelOnline()">Cancel</button>
-</div>
-
-<div id="vsScreen">
-  <div id="vsContainer">
-    <div style="text-align:center;">
-      <div class="vs-name" id="vsName1">-</div>
-      <div class="vs-elo"  id="vsElo1">ELO -</div>
+    <div id="ui">
+      Time: <span id="time">0</span>s<br>
+      Record: <span id="record">0</span>s<br>
+      Balls: <span id="balls">0</span><br>
+      Mode: <span id="mode">-</span>
     </div>
-    <div class="vs-divider">VS</div>
-    <div style="text-align:center;">
-      <div class="vs-name" id="vsName2">-</div>
-      <div class="vs-elo"  id="vsElo2">ELO -</div>
+
+    <div id="eloTable">
+      <b>ELO LIVE</b>
+      <div id="eloList"></div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+        <button style="font-size:13px;padding:6px 10px;" onclick="setTVMode('best')">BEST TV</button>
+        <button style="font-size:13px;padding:6px 10px;" onclick="setTVMode('random')">RANDOM TV</button>
+        <button style="font-size:13px;padding:6px 10px;" onclick="setTVMode('target')">TARGET TV</button>
+        <button style="font-size:13px;padding:6px 10px;" onclick="resumePlay()">▶ RESUME</button>
+      </div>
     </div>
-  </div>
-  <div id="vsCountdown">Starting in 3…</div>
-</div>
 
-<div id="winnerOverlay">
-  <h2 id="winnerText">🏆 Winner!</h2>
-  <p  id="winnerEloChange"></p>
-  <div style="display:flex;gap:16px;margin-top:30px;" id="winnerButtons"></div>
-</div>
+    <div id="menu">
+      <h1>DarkOnBalls</h1>
+      <button onclick="showScreen('onlineFlow')">🌐 Online 1v1</button>
+      <button onclick="startGame('single')">Singleplayer</button>
+      <button onclick="startGame('multi')">Multiplayer (local)</button>
+      <button onclick="startGame('ai')">AI Spectate</button>
+      <button onclick="startGame('tournament')">1vs1 Tournament</button>
+      <button onclick="startGame('coin')">🪙 Coin Hunt</button>
+      <button onclick="startGame('survival')">💀 Survival Gauntlet</button>
+      <button onclick="startGame('mirror')">🪞 Mirror Duel</button>
+      <button onclick="showScreen('leaderboardScreen');loadLeaderboard()">🏆 Leaderboard</button>
+      <button onclick="openSettings()">Settings</button>
+    </div>
 
-<div id="gameOver">
-  <h2>GAME OVER</h2>
-  <p>Survived: <span id="finalTime">0</span>s</p>
-  <button onclick="restartGame()">Play Again</button>
-  <button onclick="exitToMenu()">🏠 Home</button>
-  <div id="ranking" style="position:absolute;top:20px;right:20px;color:white;font-size:18px;text-align:left;max-height:90vh;overflow:auto;"></div>
-</div>
+    <div id="settings">
+      <h2>Settings</h2>
+      <label>Start Balls</label>
+      <input id="startBalls" type="number" value="3" min="1" max="20"><br><br>
+      <label>Spawn Time (s)</label>
+      <input id="spawnTime" type="number" value="5" min="1" max="30"><br><br>
+      <label>Ball Speed</label>
+      <select id="ballSpeed">
+        <option value="0.3">Slow</option>
+        <option value="0.5" selected>Normal</option>
+        <option value="0.8">Fast</option>
+        <option value="1">Extreme</option>
+      </select><br><br>
+      <label>AI Bots</label>
+      <input id="botCount" type="number" value="10" min="2"><br><br>
+      <label>Ranking System</label>
+      <select id="rankingMode">
+        <option value="points" selected>Points</option>
+        <option value="elo">ELO</option>
+      </select><br><br>
+      <button onclick="saveSettings()">Save</button>
+      <button onclick="showScreen('menu')">← Back</button>
+    </div>
 
-<div id="eloResult"></div>
-<canvas id="game"></canvas>
-<div id="coinHUD">🪙 <span id="coinScore">0</span> &nbsp;|&nbsp; ⏱ <span id="coinTime">60</span>s</div>
-<div id="pingDisplay">📶 -- ms</div>
-<div id="onlineHUD">
-  <div class="online-names">
-    <span id="onlineNameMe" style="color:#00ff88">Me</span>
-    <span style="color:#aaa">VS</span>
-    <span id="onlineNameOpp" style="color:#ff8844">Opp</span>
-  </div>
-  <div id="onlineStatusHUD" style="color:#aaa;font-size:13px;margin-top:4px;">Connecting…</div>
-</div>
-<div id="opponentInfo"><div id="opponentText"></div></div>
-<div id="spectatorInfo"><b>👁 Spectator Mode</b><br><div id="spectatorText"></div></div>
+    <div id="accountScreen">
+      <h2>🌐 Online Account</h2>
+      <div id="accountContent"></div>
+    </div>
 
-<div id="profileModal">
-  <div id="profileCard">
-    <span id="profileClose" onclick="closeProfile()">✕</span>
-    <h2  id="profileName"></h2>
-    <div id="profileStats"></div>
+    <div id="leaderboardScreen">
+      <h2>🏆 Online Leaderboard</h2>
+      <div id="lbTable">
+        <div class="lb-row"><span>Rank</span><span>Name</span><span>ELO</span><span>W/L</span></div>
+      </div>
+      <br><button onclick="showScreen('menu')">← Back</button>
+    </div>
+
+    <div id="onlineWait">
+      <h2>🌐 Online 1v1</h2>
+      <div id="onlineStatus">Searching for opponent…</div>
+      <div id="onlineSearchAnim" style="font-size:40px;margin:10px 0;">⏳</div>
+      <button onclick="cancelOnline()">Cancel</button>
+    </div>
+
+    <div id="vsScreen">
+      <div id="vsContainer">
+        <div style="text-align:center;">
+          <div class="vs-name" id="vsName1">-</div>
+          <div class="vs-elo"  id="vsElo1">ELO -</div>
+        </div>
+        <div class="vs-divider">VS</div>
+        <div style="text-align:center;">
+          <div class="vs-name" id="vsName2">-</div>
+          <div class="vs-elo"  id="vsElo2">ELO -</div>
+        </div>
+      </div>
+      <div id="vsCountdown">Starting in 3…</div>
+    </div>
+
+    <div id="winnerOverlay">
+      <h2 id="winnerText">🏆 Winner!</h2>
+      <p  id="winnerEloChange"></p>
+      <div style="display:flex;gap:16px;margin-top:30px;" id="winnerButtons"></div>
+    </div>
+
+    <div id="gameOver">
+      <h2>GAME OVER</h2>
+      <p>Survived: <span id="finalTime">0</span>s</p>
+      <button onclick="restartGame()">Play Again</button>
+      <button onclick="exitToMenu()">🏠 Home</button>
+      <div id="ranking" style="position:absolute;top:20px;right:20px;color:white;font-size:18px;text-align:left;max-height:90vh;overflow:auto;"></div>
+    </div>
+
+    <div id="eloResult"></div>
+    <canvas id="game"></canvas>
+    <div id="coinHUD">🪙 <span id="coinScore">0</span> &nbsp;|&nbsp; ⏱ <span id="coinTime">60</span>s</div>
+    <div id="pingDisplay">📶 -- ms</div>
+    <div id="onlineHUD">
+      <div class="online-names">
+        <span id="onlineNameMe" style="color:#00ff88">Me</span>
+        <span style="color:#aaa">VS</span>
+        <span id="onlineNameOpp" style="color:#ff8844">Opp</span>
+      </div>
+      <div id="onlineStatusHUD" style="color:#aaa;font-size:13px;margin-top:4px;">Connecting…</div>
+    </div>
+    <div id="opponentInfo"><div id="opponentText"></div></div>
+    <div id="spectatorInfo"><b>👁 Spectator Mode</b><br><div id="spectatorText"></div></div>
+
+    <div id="profileModal">
+      <div id="profileCard">
+        <span id="profileClose" onclick="closeProfile()">✕</span>
+        <h2  id="profileName"></h2>
+        <div id="profileStats"></div>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
 // ═══════════════════════════════════════════════
+//  CANVAS — FIXED VIRTUAL RESOLUTION (identical on every device)
 // ═══════════════════════════════════════════════
-//  CANVAS & RESIZE (Feste Höhe, variable Breite)
-// ═══════════════════════════════════════════════
-const canvas = document.getElementById("game"); // Korrigiert von gameCanvas auf game
-const ctx    = canvas.getContext("2d");
+// The whole game logic always runs in a fixed 1280x720 "virtual" world.
+// The #gameWrap container is scaled (via CSS transform-free resize, real
+// canvas backing store) to fit the screen using a fixed aspect ratio with
+// letterboxing — so PC, iPad, iPhone etc. all see EXACTLY the same layout,
+// just scaled uniformly. No more "PC has more space on the right".
+const V_W = 1280;
+const V_H = 720;
 
-const V_H = 768;  // Feste iPad-Referenzhöhe im Querformat
-let V_W   = 1024; // Virtuelle Breite (wird dynamisch angepasst)
+const stage   = document.getElementById("stage");
+const gameWrap= document.getElementById("gameWrap");
+const canvas  = document.getElementById("game");
+const ctx     = canvas.getContext("2d");
+
 let scale = 1;
 
 function W() { return V_W; }
@@ -302,34 +324,37 @@ function H() { return V_H; }
 
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  const screenW = window.innerWidth;
-  const screenH = window.innerHeight;
+  const screenW = stage.clientWidth;
+  const screenH = stage.clientHeight;
 
-  // Skaliere alles basierend auf der tatsächlichen Bildschirmhöhe
-  scale = screenH / V_H;
-  V_W   = screenW / scale; // Die Breite passt sich dynamisch an (keine schwarzen Balken)
+  // Uniform scale to fit the fixed virtual resolution into the screen (letterbox)
+  scale = Math.min(screenW / V_W, screenH / V_H);
 
-  canvas.style.width  = screenW + "px";
-  canvas.style.height = screenH + "px";
-  canvas.width  = Math.round(screenW * dpr);
-  canvas.height = Math.round(screenH * dpr);
+  const cssW = V_W * scale;
+  const cssH = V_H * scale;
 
-  // Transformation zurücksetzen, DPR anwenden und Skalierung der Welt vornehmen
+  gameWrap.style.width  = cssW + "px";
+  gameWrap.style.height = cssH + "px";
+
+  canvas.style.width  = cssW + "px";
+  canvas.style.height = cssH + "px";
+  canvas.width  = Math.round(V_W * dpr);
+  canvas.height = Math.round(V_H * dpr);
+
+  // Render in virtual-resolution coordinate space always
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.scale(scale, scale);
 }
 
 function screenToVirtual(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
   return {
-    x: (clientX - rect.left) / scale,
-    y: (clientY - rect.top) / scale
+    x: (clientX - rect.left) * (V_W / rect.width),
+    y: (clientY - rect.top)  * (V_H / rect.height)
   };
 }
 
 window.addEventListener("resize", resize);
 resize();
-
 
 // ═══════════════════════════════════════════════
 //  ROUNDRECT POLYFILL
@@ -356,10 +381,7 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 let fbReady = false;
 window.addEventListener("firebaseReady", async () => {
   fbReady = true;
-
-  if (onlineAccount) {
-    await pushAccountToFirebase();
-  }
+  if (onlineAccount) await pushAccountToFirebase();
 });
 function dbRef(path)           { return window._firebaseRef(window._firebaseDB, path); }
 async function dbGet(path)     { return (await window._firebaseGet(dbRef(path))).val(); }
@@ -397,6 +419,11 @@ let playerRadiusSetting = 18;
 let aiBotCount          = 10;
 let rankingMode         = "points";
 
+// Fixed online-mode settings (always these values, regardless of local Settings screen)
+const ONLINE_START_BALLS = 0;
+const ONLINE_SPAWN_MS    = 1000;
+const ONLINE_BALL_SPEED  = 0.5; // "Normal"
+
 function openSettings() { showScreen("settings"); }
 function saveSettings() {
   startBallCount      = Number(document.getElementById("startBalls").value);
@@ -427,7 +454,7 @@ let mirrorBot = null;
 let survivalWave = 1;
 
 // ═══════════════════════════════════════════════
-//  ONLINE STATE — completely rewritten
+//  ONLINE STATE
 // ═══════════════════════════════════════════════
 let onlineMatchId        = null;
 let onlineRole           = null;   // "p1" or "p2"
@@ -435,11 +462,16 @@ let onlineOpponent       = null;
 let onlineUnsubscribes   = [];
 let onlineSearchInterval = null;
 let onlineResultHandled  = false;
-let onlineIsHost         = false;  // p1 is host: controls ball physics & spawning
+let onlineIsHost         = false;  // p1 is host: authoritative ball physics
+let onlineVsBot          = false;  // true if opponent is the fallback AI bot
 
-// Balls are owned by host (p1). p2 reads ball state from Firebase.
-let onlineBallPushTimer  = 0;
-let onlinePosPushTimer   = 0;
+let onlineRng             = null;
+let onlineBallSpawnTimer  = 0;
+let onlineSearchStartTime = 0;
+let onlineBotMatchTimeout = null;
+
+// Deterministic local simulation tick counter (for resync drift correction)
+let onlineSimTick = 0;
 
 let record = parseInt(localStorage.getItem("fingerDodgeRecord") || "0");
 document.getElementById("record").textContent = record;
@@ -472,6 +504,7 @@ function clearAllTimers() {
   if (spawnTimeoutId)     { clearTimeout(spawnTimeoutId);      spawnTimeoutId     = null; }
   if (survivalIntervalId) { clearInterval(survivalIntervalId); survivalIntervalId = null; }
   if (coinIntervalId)     { clearInterval(coinIntervalId);     coinIntervalId     = null; }
+  if (onlineBotMatchTimeout) { clearTimeout(onlineBotMatchTimeout); onlineBotMatchTimeout = null; }
 }
 
 // ═══════════════════════════════════════════════
@@ -577,14 +610,16 @@ function cancelOnline() {
 
 function cleanupOnline() {
   if (onlineSearchInterval) { clearInterval(onlineSearchInterval); onlineSearchInterval = null; }
+  if (onlineBotMatchTimeout) { clearTimeout(onlineBotMatchTimeout); onlineBotMatchTimeout = null; }
   const unsubs = [...onlineUnsubscribes];
   onlineUnsubscribes = [];
   unsubs.forEach(fn => { try { fn(); } catch(e) {} });
 
   if (fbReady && onlineAccount) {
     dbRemove("queue/" + onlineAccount.name).catch(() => {});
+    dbRemove("queue/" + onlineAccount.name + "_invite").catch(() => {});
   }
-  if (fbReady && onlineMatchId) {
+  if (fbReady && onlineMatchId && !onlineVsBot) {
     dbUpdate("onlineMatches/" + onlineMatchId, { status: "abandoned" }).catch(() => {});
   }
   onlineMatchId       = null;
@@ -592,6 +627,7 @@ function cleanupOnline() {
   onlineOpponent      = null;
   onlineResultHandled = false;
   onlineIsHost        = false;
+  onlineVsBot         = false;
   document.getElementById("pingDisplay").style.display   = "none";
   document.getElementById("onlineHUD").style.display     = "none";
 }
@@ -609,20 +645,17 @@ async function cleanStaleMatches() {
     }
   } catch(e) {}
 }
+
 async function acceptInvite(data) {
   if (onlineMatchId) return;
-  
   const matchData = await dbGet("onlineMatches/" + data.matchId);
   if (!matchData) return;
 
-  if (onlineSearchInterval) {
-    clearInterval(onlineSearchInterval);
-    onlineSearchInterval = null;
-  }
+  if (onlineSearchInterval) { clearInterval(onlineSearchInterval); onlineSearchInterval = null; }
+  if (onlineBotMatchTimeout) { clearTimeout(onlineBotMatchTimeout); onlineBotMatchTimeout = null; }
 
   const opp = { name: data.opp, elo: data.oppElo };
 
-  // Eigene Queue- und Einladungsdaten aus der DB löschen
   await dbRemove("queue/" + onlineAccount.name + "_invite");
   await dbRemove("queue/" + onlineAccount.name);
 
@@ -635,16 +668,14 @@ async function startSearchingOnline() {
     return;
   }
   await cleanStaleMatches();
-  // Write ourselves to queue
+  onlineSearchStartTime = Date.now();
+
   await dbSet("queue/" + onlineAccount.name, {
     name: onlineAccount.name, elo: onlineAccount.elo, ts: Date.now()
   });
 
-  // Also listen to queue so we react immediately if someone creates a match for us
   const queueUnsub = dbOn("queue/" + onlineAccount.name + "_invite", (data) => {
     if (data && data.matchId && !onlineMatchId) {
-      // We were invited — join the match
-      const unsub = onlineUnsubscribes.find(x => x === queueUnsub);
       acceptInvite(data);
     }
   });
@@ -657,6 +688,11 @@ async function startSearchingOnline() {
     try { await tryMatchmake(); } catch(e) { console.warn("matchmake error:", e); }
   }, 2000);
   setTimeout(() => tryMatchmake(), 600);
+
+  // FIX #3: after 30s with no human opponent found, pair with a weak AI bot
+  onlineBotMatchTimeout = setTimeout(() => {
+    if (!onlineMatchId) startBotMatch();
+  }, 30000);
 }
 
 async function tryMatchmake() {
@@ -692,21 +728,16 @@ async function tryMatchmake() {
     status: "waiting",
     winner: null,
     createdAt: Date.now(),
-    seed: Math.floor(Math.random() * 1000000),
-    ballSpeedMult: ballSpeedMultiplier,
-    startBalls: startBallCount
+    seed: Math.floor(Math.random() * 1000000)
   };
   try {
     const existingCheck = await dbGet("onlineMatches/" + matchId);
-
-    // KORREKTUR: Überschreiben erlauben, wenn das alte Spiel vorbei ist
     if (!existingCheck || existingCheck.status === "done" || existingCheck.status === "abandoned") {
       await dbSet("onlineMatches/" + matchId, matchData);
     } else {
-      return; 
+      return;
     }
 
-    // Einladung für den Gegner hinterlegen
     await dbSet("queue/" + opp.name + "_invite", {
       matchId: matchId,
       opp: onlineAccount.name,
@@ -715,21 +746,43 @@ async function tryMatchmake() {
 
     await dbRemove("queue/" + onlineAccount.name);
     await dbRemove("queue/" + opp.name);
-    
- joinMatch(matchId, opp, matchData);
+
+    joinMatch(matchId, opp, matchData);
   } catch(e) {
     console.warn("No response or match creation race:", e);
   }
 }
 
+// FIX #3: weak AI bot fallback opponent after 30s of searching
+function startBotMatch() {
+  if (onlineMatchId) return;
+  if (onlineSearchInterval) { clearInterval(onlineSearchInterval); onlineSearchInterval = null; }
 
+  dbRemove("queue/" + onlineAccount.name).catch(() => {});
+
+  const botNames = ["ShadowBot","ByteRunner","NullPointer","EchoAI","VoidWalker","GhostProc"];
+  const botName  = botNames[Math.floor(Math.random()*botNames.length)] + "_" + Math.floor(Math.random()*100);
+
+  onlineVsBot    = true;
+  onlineMatchId  = "BOT__" + Date.now();
+  onlineRole     = "p1";
+  onlineIsHost   = true;
+  onlineOpponent = { name: botName, elo: Math.max(800, onlineAccount.elo - 150), skill: 0.30 };
+  onlineResultHandled = false;
+
+  showVSScreen(onlineAccount.name, onlineAccount.elo, botName, onlineOpponent.elo, () => {
+    startOnlineGame({ seed: Math.floor(Math.random()*1000000) });
+  });
+}
 
 function joinMatch(matchId, opp, matchData) {
   if (onlineMatchId) return;
   if (onlineSearchInterval) { clearInterval(onlineSearchInterval); onlineSearchInterval = null; }
+  if (onlineBotMatchTimeout) { clearTimeout(onlineBotMatchTimeout); onlineBotMatchTimeout = null; }
   onlineMatchId       = matchId;
   onlineOpponent      = opp;
   onlineResultHandled = false;
+  onlineVsBot         = false;
 
   const p1Name = matchData.p1;
   onlineRole   = (onlineAccount.name === p1Name) ? "p1" : "p2";
@@ -764,7 +817,7 @@ function showVSScreen(n1, e1, n2, e2, callback) {
 }
 
 // ═══════════════════════════════════════════════
-//  SEEDED RNG (so both clients make identical balls)
+//  SEEDED RNG (deterministic across both clients)
 // ═══════════════════════════════════════════════
 function makeLCG(seed) {
   let s = seed >>> 0;
@@ -775,12 +828,15 @@ function makeLCG(seed) {
 }
 
 // ═══════════════════════════════════════════════
-//  ONLINE GAME — fully synchronized
+//  ONLINE GAME
+//  FIX #1 + #2: both clients run the SAME deterministic ball physics
+//  every frame (seeded RNG + same fixed-resolution world + same spawn
+//  schedule), so motion is always 60fps-smooth locally on both ends —
+//  no waiting on network packets for every frame. The host still
+//  periodically broadcasts an authoritative snapshot, but the client
+//  only *gently* corrects drift instead of replacing positions outright,
+//  so a lag spike never causes a visible stutter.
 // ═══════════════════════════════════════════════
-let onlineRng = null;
-let onlineBallSpawnTimer = 0;
-let onlineSpawnInterval  = 5000;
-
 function startOnlineGame(matchData) {
   hideAllScreensForGame();
   mode    = "online";
@@ -790,13 +846,12 @@ function startOnlineGame(matchData) {
   running = true;
   startTime = Date.now();
   onlineResultHandled = false;
+  onlineSimTick = 0;
 
-  // Beide Clients nutzen denselben Seed
-  onlineRng           = makeLCG(matchData.seed || 42);
-  onlineSpawnInterval = 1000; // Fest auf 1 Sekunde eingestellt (1000ms)
-  const speedMult     = 0.5;  // Fest auf "Normal" (0.5) eingestellt
+  onlineRng            = makeLCG(matchData.seed || 42);
+  onlineBallSpawnTimer = Date.now();
 
-  document.getElementById("mode").textContent = "Online 1v1";
+  document.getElementById("mode").textContent = onlineVsBot ? "Online 1v1 (Bot)" : "Online 1v1";
 
   const myColor  = onlineRole === "p1" ? "#00ff88" : "#ff8844";
   const oppColor = onlineRole === "p1" ? "#ff8844" : "#00ff88";
@@ -809,19 +864,32 @@ function startOnlineGame(matchData) {
 
   const mePlayer  = createPlayer(meX,  py, myColor,  myName);
   const oppPlayer = createPlayer(oppX, py, oppColor, oppName);
-  players.push(mePlayer, oppPlayer);
 
-  // Am Anfang starten wir mit 0 Bällen (kein Schleifen-Spawn beim Start)
-  onlineBallSpawnTimer = Date.now();
+  if (onlineVsBot) {
+    // Weak bot: low skill stats so it's an easy fallback opponent
+    const s = 0.30;
+    oppPlayer.skill      = { aim:s, reaction:s, movement:s, awareness:s, aggression:s };
+    oppPlayer.speed      = 1.2 + s * 3;
+    oppPlayer.awareness  = 60  + s * 80;
+    oppPlayer.dodgePower = 0.3 + s * 1.2;
+    oppPlayer.randomness = (1 - s) * 5;
+  }
+
+  players.push(mePlayer, oppPlayer);
 
   document.getElementById("onlineNameMe").textContent  = myName;
   document.getElementById("onlineNameOpp").textContent = oppName;
   document.getElementById("onlineHUD").style.display   = "flex";
   document.getElementById("pingDisplay").style.display = "block";
+  document.getElementById("onlineStatusHUD").textContent = onlineVsBot ? "Practice match" : "";
+
+  if (onlineVsBot) {
+    // No network needed; runs as a fully local match
+    return;
+  }
 
   if (onlineIsHost) {
-    // Erhöhte Sync-Frequenz (45ms statt 80ms) für ein flüssigeres Spielgefühl
-    setInterval(pushBallState, 45);
+    setInterval(pushBallState, 100);
   }
 
   const matchUnsub = dbOn("onlineMatches/" + onlineMatchId, (data) => {
@@ -838,10 +906,14 @@ function startOnlineGame(matchData) {
       }
     }
 
+    // FIX #1/#2: snapshot is a gentle correction only, not a hard overwrite.
+    // This prevents a single delayed/lagged packet from causing a visible
+    // jump or freeze — balls keep moving smoothly via local simulation,
+    // and we just nudge them toward the authoritative state.
     if (!onlineIsHost && data.ballState) {
       try {
         const bs = JSON.parse(data.ballState);
-        balls = bs.map(b => ({ ...b }));
+        applyBallCorrection(bs);
       } catch(e) {}
     }
 
@@ -865,57 +937,80 @@ function startOnlineGame(matchData) {
     [onlineRole + "Ready"]: true
   }).catch(() => {});
 
+  // FIX #2: ping measurement with rolling smoothing so a single spike
+  // doesn't show as a misleading 600ms reading; uses median of last 3.
+  const pingHistory = [];
   const pingIv = setInterval(async () => {
     if (!running || mode !== "online") { clearInterval(pingIv); return; }
     const t0 = Date.now();
     try {
       await dbSet("onlineMatches/" + onlineMatchId + "/ping_" + onlineRole, Date.now());
-      document.getElementById("pingDisplay").textContent = "📶 " + (Date.now() - t0) + " ms";
+      const rtt = Date.now() - t0;
+      pingHistory.push(rtt);
+      if (pingHistory.length > 3) pingHistory.shift();
+      const sorted = [...pingHistory].sort((a,b)=>a-b);
+      const median = sorted[Math.floor(sorted.length/2)];
+      document.getElementById("pingDisplay").textContent = "📶 " + median + " ms";
     } catch(e) {}
-  }, 3000);
+  }, 2500);
 }
 
-
-// Make a ball using shared deterministic RNG
-function makeOnlineBall(speedMult) {
-  // Ignoriere globale Einstellungen und setze Geschwindigkeit fest auf 0.5 (Normal)
-  speedMult = 0.5; 
+// Generate the Nth deterministic ball using the shared seeded RNG.
+// Both host and client call this identically as their spawn timer fires,
+// so balls always appear in perfect sync without needing a network packet
+// per-spawn — this is what keeps motion silky smooth even under latency.
+function makeOnlineBall() {
   const rng = onlineRng || Math.random;
   const r   = 15 + rng() * 20;
   let x, y, valid = false, tries = 0;
-  const minDistance = 220; // Sicherer Spawn-Mindestabstand in Pixeln (riesiger Abstand)
-  
+  const minDistance = 220;
+
   while (!valid && tries++ < 100) {
     x = r + rng() * (W() - r * 2);
     y = r + rng() * (H() - r * 2);
     valid = true;
-    
-    // Überprüfe den Abstand zu allen aktiven Spielern
     for (const p of players) {
       if (!p.alive) continue;
-      const dx = p.x - x;
-      const dy = p.y - y;
-      if (Math.sqrt(dx*dx + dy*dy) < p.radius + r + minDistance) {
-        valid = false;
-        break; // Zu nah an einem Spieler, neuen Punkt suchen
-      }
+      const dx = p.x - x, dy = p.y - y;
+      if (Math.sqrt(dx*dx + dy*dy) < p.radius + r + minDistance) { valid = false; break; }
     }
   }
-  
   const spd = 5 + rng() * 6;
   const ang = rng() * Math.PI * 2;
   return {
     x, y, radius: r,
-    vx: Math.cos(ang) * spd * speedMult,
-    vy: Math.sin(ang) * spd * speedMult
+    vx: Math.cos(ang) * spd * ONLINE_BALL_SPEED,
+    vy: Math.sin(ang) * spd * ONLINE_BALL_SPEED
   };
 }
 
+// Gently correct ball drift toward host's authoritative snapshot instead
+// of teleporting — eliminates visible stutter from lag spikes (FIX #2).
+function applyBallCorrection(authoritative) {
+  // Match by index (balls spawn in lockstep so indices line up)
+  for (let i = 0; i < authoritative.length; i++) {
+    const a = authoritative[i];
+    if (!balls[i]) {
+      balls[i] = { x: a.x, y: a.y, vx: a.vx, vy: a.vy, radius: a.radius };
+      continue;
+    }
+    const b = balls[i];
+    // Position: nudge 15% toward authoritative (smooth, no jump)
+    b.x += (a.x - b.x) * 0.15;
+    b.y += (a.y - b.y) * 0.15;
+    // Velocity: trust the authoritative value (it's the physics source of truth)
+    b.vx = a.vx;
+    b.vy = a.vy;
+    b.radius = a.radius;
+  }
+  // Remove any extra local balls that host doesn't have (e.g. desynced extra)
+  if (balls.length > authoritative.length) balls.length = authoritative.length;
+}
 
-// Push my position (only position, not physics)
+// Push my position
 let lastPosPush = 0;
 function pushMyPosition() {
-  if (!fbReady || !onlineMatchId || !running || mode !== "online") return;
+  if (!fbReady || !onlineMatchId || !running || mode !== "online" || onlineVsBot) return;
   const now = Date.now();
   if (now - lastPosPush < 50) return;
   lastPosPush = now;
@@ -926,12 +1021,12 @@ function pushMyPosition() {
   }).catch(() => {});
 }
 
-// Host pushes ball state so both clients are in sync
+// Host pushes ball state periodically as a correction reference (FIX #1/#2)
 let lastBallPush = 0;
 function pushBallState() {
-  if (!onlineIsHost || !fbReady || !onlineMatchId || !running) return;
+  if (!onlineIsHost || !fbReady || !onlineMatchId || !running || onlineVsBot) return;
   const now = Date.now();
-  if (now - lastBallPush < 80) return; // ~12fps for balls is fine
+  if (now - lastBallPush < 100) return;
   lastBallPush = now;
   const bs = JSON.stringify(balls.map(b => ({
     x: Math.round(b.x), y: Math.round(b.y),
@@ -1054,7 +1149,7 @@ function createPlayer(x, y, color, name) {
   };
   return {
     x, y,
-    tx: x, ty: y,  // target position for interpolation
+    tx: x, ty: y,
     radius: playerRadiusSetting, color, name,
     points: 0, elo: 1500, lastChange: 0, alive: true, games: 0,
     skill,
@@ -1404,52 +1499,45 @@ function update() {
   // ── Online mode ──
   if (mode === "online") {
     pushMyPosition();
+    onlineSimTick++;
 
-    // Host: advance ball physics and push state
-    if (onlineIsHost) {
-      // Spawn new ball periodically
-      if (Date.now() - onlineBallSpawnTimer > onlineSpawnInterval) {
-        onlineBallSpawnTimer = Date.now();
-        balls.push(makeOnlineBall(ballSpeedMultiplier));
-      }
-      // Move balls (host owns physics)
-      for (const b of balls) {
-        b.x += b.vx; b.y += b.vy;
-        if (b.x - b.radius < 0)   { b.vx =  Math.abs(b.vx); b.x = b.radius; }
-        if (b.x + b.radius > W()) { b.vx = -Math.abs(b.vx); b.x = W()-b.radius; }
-        if (b.y - b.radius < 0)   { b.vy =  Math.abs(b.vy); b.y = b.radius; }
-        if (b.y + b.radius > H()) { b.vy = -Math.abs(b.vy); b.y = H()-b.radius; }
-      }
-      pushBallState();
+    // FIX #1: BOTH host and client run identical local ball spawning
+    // and physics every frame (same seed, same fixed resolution, same
+    // spawn cadence) -> motion is always smooth 60fps locally, with no
+    // dependency on receiving a network frame to move balls.
+    if (Date.now() - onlineBallSpawnTimer > ONLINE_SPAWN_MS) {
+      onlineBallSpawnTimer = Date.now();
+      balls.push(makeOnlineBall());
     }
-    // p2: Bälle lokal weiterberechnen für butterweiche 60 FPS ohne Ruckler!
-else {
-  for (const b of balls) {
-    b.x += b.vx; b.y += b.vy;
-    if (b.x - b.radius < 0)   { b.vx =  Math.abs(b.vx); b.x = b.radius; }
-    if (b.x + b.radius > W()) { b.vx = -Math.abs(b.vx); b.x = W()-b.radius; }
-    if (b.y - b.radius < 0)   { b.vy =  Math.abs(b.vy); b.y = b.radius; }
-    if (b.y + b.radius > H()) { b.vy = -Math.abs(b.vy); b.y = H()-b.radius; }
-  }
-}
+    for (const b of balls) {
+      b.x += b.vx; b.y += b.vy;
+      if (b.x - b.radius < 0)   { b.vx =  Math.abs(b.vx); b.x = b.radius; }
+      if (b.x + b.radius > W()) { b.vx = -Math.abs(b.vx); b.x = W()-b.radius; }
+      if (b.y - b.radius < 0)   { b.vy =  Math.abs(b.vy); b.y = b.radius; }
+      if (b.y + b.radius > H()) { b.vy = -Math.abs(b.vy); b.y = H()-b.radius; }
+    }
+    if (onlineIsHost && !onlineVsBot) pushBallState();
 
-
-    // Interpolate opponent position smoothly
-    for (const p of players) {
-      if (p.name !== onlineAccount.name && p.tx !== undefined) {
-        p.x += (p.tx - p.x) * 0.3;
-        p.y += (p.ty - p.y) * 0.3;
+    // Bot opponent: run simple AI locally (no network)
+    if (onlineVsBot) {
+      const bot = players.find(p => p.name !== onlineAccount.name);
+      if (bot && bot.alive) updateAI(bot, balls);
+    } else {
+      // Interpolate opponent position smoothly from network state
+      for (const p of players) {
+        if (p.name !== onlineAccount.name && p.tx !== undefined) {
+          p.x += (p.tx - p.x) * 0.3;
+          p.y += (p.ty - p.y) * 0.3;
+        }
       }
     }
 
-    // Clamp me
     const me = players.find(p => p.name === onlineAccount.name);
     if (me) {
       me.x = Math.max(me.radius, Math.min(W()-me.radius, me.x));
       me.y = Math.max(me.radius, Math.min(H()-me.radius, me.y));
     }
 
-    // Collision check only for me
     if (me && me.alive) checkOnlineCollision(me);
     return;
   }
@@ -1517,9 +1605,16 @@ function checkOnlineCollision(me) {
     const dx = me.x - b.x, dy = me.y - b.y;
     if (Math.sqrt(dx*dx + dy*dy) < me.radius + b.radius) {
       me.alive = false;
-      // Report: the other player wins
       const opp = players.find(p => p.name !== me.name);
-      reportOnlineResult(opp ? opp.name : "", me.name);
+
+      if (onlineVsBot) {
+        // Local result, no network round trip needed
+        const diff   = Math.abs(onlineAccount.elo - (onlineOpponent?.elo || 1200));
+        const change = Math.max(1, Math.min(8, Math.round(3 + diff / 150))); // smaller swing vs bot
+        handleOnlineResult(opp ? opp.name : "", change);
+      } else {
+        reportOnlineResult(opp ? opp.name : "", me.name);
+      }
       return;
     }
   }
@@ -1590,7 +1685,6 @@ function checkCollision(p) {
 
 async function reportOnlineResult(winnerName, loserName) {
   if (onlineResultHandled) return;
-  // KORREKTUR: onlineResultHandled hier NICHT vorab auf true setzen!
 
   const diff   = Math.abs(onlineAccount.elo - (onlineOpponent?.elo || 1500));
   const change = Math.max(1, Math.min(15, Math.round(5 + diff / 100)));
@@ -1601,14 +1695,12 @@ async function reportOnlineResult(winnerName, loserName) {
         status: "done", winner: winnerName, eloChange: change
       });
     } catch(e) {
-      // Fallback, falls die Datenbankverbindung fehlschlägt
       handleOnlineResult(winnerName, change);
     }
   } else {
     handleOnlineResult(winnerName, change);
   }
 }
-
 
 // ═══════════════════════════════════════════════
 //  TOURNAMENT FINISH
@@ -1978,7 +2070,7 @@ function draw() {
 }
 
 // ═══════════════════════════════════════════════
-//  CONTROLS — fixed touch offset for iPhone
+//  CONTROLS — coordinates always mapped through the fixed virtual canvas
 // ═══════════════════════════════════════════════
 function moveSingle(x, y) {
   if (spectateModeActive || humanRemovedFromQueue) return;
@@ -2013,15 +2105,6 @@ document.addEventListener("keydown", e => { keys[e.key.toLowerCase()] = true; })
 document.addEventListener("keyup",   e => { keys[e.key.toLowerCase()] = false; });
 
 canvas.addEventListener("mousemove", e => {
-  if (running && ["single","tournament","coin","mirror","online","survival"].includes(mode))
-    moveSingle(e.clientX, e.clientY);
-});
-
-// Fix: use getBoundingClientRect for correct coordinates on all devices including iPhone
-// ═══════════════════════════════════════════════
-//  CONTROLS — Event-Listener angepasst auf Skalierung
-// ═══════════════════════════════════════════════
-canvas.addEventListener("mousemove", e => {
   if (running && ["single","tournament","coin","mirror","online","survival"].includes(mode)) {
     const pos = screenToVirtual(e.clientX, e.clientY);
     moveSingle(pos.x, pos.y);
@@ -2045,7 +2128,6 @@ canvas.addEventListener("touchstart", e => {
   const pos   = screenToVirtual(touch.clientX, touch.clientY);
   moveSingle(pos.x, pos.y);
 }, { passive: false });
-
 </script>
 </body>
 </html>
