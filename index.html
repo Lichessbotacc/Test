@@ -749,6 +749,7 @@ async function tryMatchmake() {
 }
 
 // FIX #3: weak AI bot fallback opponent after 30s of searching
+// FIX #3: weak AI bot fallback opponent after 30s of searching
 function startBotMatch() {
   if (onlineMatchId) return;
   if (onlineSearchInterval) { 
@@ -769,32 +770,45 @@ function startBotMatch() {
 
   onlineOpponent = {
     name: "Online Bot",
-    elo: onlineBotElo,
+    elo: onlineBotElo || 1500,
+    wins: 0,
+    losses: 0,
+    highestElo: 1500,
+    lowestElo: 1500,
+    currentStreak: 0,
+    bestStreak: 0,
+    totalEloGained: 0,
+    totalEloLost: 0,
+    bestWinChange: 0,
+    bestWinOpp: "",
+    worstLossChange: 0,
+    worstLossOpp: "",
     skill: 0.30
   };
 
   onlineResultHandled = false;
 
-  // === WICHTIG: Bot-Stats aus Firebase laden ===
+  // === ALLE HISTORISCHEN DATEN LADEN ===
   if (fbReady) {
     dbGet("players/Online Bot").then(data => {
       if (data) {
-        onlineOpponent.elo    = data.elo    || onlineBotElo;
-        onlineOpponent.wins   = data.wins   || 0;
-        onlineOpponent.losses = data.losses || 0;
-      } else {
-        onlineOpponent.wins   = 0;
-        onlineOpponent.losses = 0;
+        onlineOpponent.elo            = data.elo ?? onlineOpponent.elo;
+        onlineOpponent.wins           = data.wins ?? 0;
+        onlineOpponent.losses         = data.losses ?? 0;
+        onlineOpponent.highestElo     = data.highestElo ?? onlineOpponent.elo;
+        onlineOpponent.lowestElo      = data.lowestElo ?? onlineOpponent.elo;
+        onlineOpponent.currentStreak  = data.currentStreak ?? 0;
+        onlineOpponent.bestStreak     = data.bestStreak ?? 0;
+        onlineOpponent.totalEloGained = data.totalEloGained ?? 0;
+        onlineOpponent.totalEloLost   = data.totalEloLost ?? 0;
+        onlineOpponent.bestWinChange  = data.bestWinChange ?? 0;
+        onlineOpponent.bestWinOpp     = data.bestWinOpp ?? "";
+        onlineOpponent.worstLossChange= data.worstLossChange ?? 0;
+        onlineOpponent.worstLossOpp   = data.worstLossOpp ?? "";
       }
       onlineBotElo = onlineOpponent.elo;
       localStorage.setItem("onlineBotElo", onlineBotElo);
-    }).catch(() => {
-      onlineOpponent.wins   = 0;
-      onlineOpponent.losses = 0;
-    });
-  } else {
-    onlineOpponent.wins   = 0;
-    onlineOpponent.losses = 0;
+    }).catch(() => {});
   }
 
   showVSScreen(
@@ -1098,35 +1112,55 @@ async function handleOnlineResult(winnerName, change) {
   setTimeout(() => showWinnerOverlay(winnerName, won ? eloChange : -eloChange), 2600);
 
   // --- Online Bot Stats aktualisieren ---
-  if (onlineVsBot && onlineOpponent) {
+    if (onlineVsBot && onlineOpponent) {
     if (won) {
       // Spieler gewinnt → Bot verliert
       onlineOpponent.elo = Math.max(100, onlineOpponent.elo - eloChange);
-      if (!onlineOpponent.losses) onlineOpponent.losses = 0;
-      onlineOpponent.losses++;
+      onlineOpponent.losses = (onlineOpponent.losses || 0) + 1;
+      onlineOpponent.currentStreak = 0;
+      onlineOpponent.totalEloLost = (onlineOpponent.totalEloLost || 0) + eloChange;
+      if (onlineOpponent.elo < (onlineOpponent.lowestElo || 1500)) {
+        onlineOpponent.lowestElo = onlineOpponent.elo;
+      }
     } else {
       // Bot gewinnt → Spieler verliert
       onlineOpponent.elo += eloChange;
-      if (!onlineOpponent.wins) onlineOpponent.wins = 0;
-      onlineOpponent.wins++;
+      onlineOpponent.wins = (onlineOpponent.wins || 0) + 1;
+      onlineOpponent.currentStreak = (onlineOpponent.currentStreak || 0) + 1;
+      if (onlineOpponent.currentStreak > (onlineOpponent.bestStreak || 0)) {
+        onlineOpponent.bestStreak = onlineOpponent.currentStreak;
+      }
+      onlineOpponent.totalEloGained = (onlineOpponent.totalEloGained || 0) + eloChange;
+      if (onlineOpponent.elo > (onlineOpponent.highestElo || 1500)) {
+        onlineOpponent.highestElo = onlineOpponent.elo;
+      }
     }
 
     onlineBotElo = onlineOpponent.elo;
     localStorage.setItem("onlineBotElo", onlineBotElo);
 
-    // In Firebase speichern (mit aktualisierten Wins/Losses)
+    // ALLE Daten speichern
     if (fbReady) {
       await dbSet("players/Online Bot", {
         name: "Online Bot",
         elo: onlineBotElo,
         wins: onlineOpponent.wins || 0,
         losses: onlineOpponent.losses || 0,
+        highestElo: onlineOpponent.highestElo || onlineBotElo,
+        lowestElo: onlineOpponent.lowestElo || onlineBotElo,
+        currentStreak: onlineOpponent.currentStreak || 0,
+        bestStreak: onlineOpponent.bestStreak || 0,
+        totalEloGained: onlineOpponent.totalEloGained || 0,
+        totalEloLost: onlineOpponent.totalEloLost || 0,
+        bestWinChange: onlineOpponent.bestWinChange || 0,
+        bestWinOpp: onlineOpponent.bestWinOpp || "",
+        worstLossChange: onlineOpponent.worstLossChange || 0,
+        worstLossOpp: onlineOpponent.worstLossOpp || "",
         updatedAt: Date.now()
       });
     }
   }
 }
-
 function showWinnerOverlay(winnerName, eloChange) {
   document.getElementById("winnerText").innerHTML =
     `🏆 Winner: <span style="color:gold">${winnerName}</span>`;
