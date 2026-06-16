@@ -392,7 +392,7 @@ async function dbRemove(path)  { return window._firebaseRemove(dbRef(path)); }
 // ═══════════════════════════════════════════════
 let onlineAccount = null;
 try { onlineAccount = JSON.parse(localStorage.getItem("dobAccount") || "null"); } catch(e) {}
-onlineBotElo = parseInt(localStorage.getItem("onlineBotElo")) || 1500;
+
 function saveAccountLocal() {
   if (onlineAccount) localStorage.setItem("dobAccount", JSON.stringify(onlineAccount));
 }
@@ -464,7 +464,7 @@ let onlineRng             = null;
 let onlineBallSpawnTimer  = 0;
 let onlineSearchStartTime = 0;
 let onlineBotMatchTimeout = null;
-let onlineBotElo = 1500;
+let onlineBotElo = parseInt(localStorage.getItem("onlineBotElo")) || 1500;
 // Deterministic local simulation tick counter (for resync drift correction)
 let onlineSimTick = 0;
 
