@@ -1035,7 +1035,7 @@ function pushBallState() {
   dbUpdate("onlineMatches/" + onlineMatchId, { ballState: bs }).catch(() => {});
 }
 
-function handleOnlineResult(winnerName, change) {
+async function handleOnlineResult(winnerName, change) {
   if (onlineResultHandled) return;
   onlineResultHandled = true;
   running = false;
