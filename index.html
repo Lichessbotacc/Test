@@ -755,18 +755,15 @@ function startBotMatch() {
 
   dbRemove("queue/" + onlineAccount.name).catch(() => {});
 
-  const botNames = ["ShadowBot","ByteRunner","NullPointer","EchoAI","VoidWalker","GhostProc"];
-  const botName  = botNames[Math.floor(Math.random()*botNames.length)] + "_" + Math.floor(Math.random()*100);
-
-  onlineVsBot    = true;
+    onlineVsBot    = true;
   onlineMatchId  = "BOT__" + Date.now();
   onlineRole     = "p1";
   onlineIsHost   = true;
   onlineOpponent = {
-  name: "Online Bot",
-  elo: onlineBotElo,
-  skill: 0.30
-};
+    name: "Online Bot",
+    elo: onlineBotElo,
+    skill: 0.30
+  };
   onlineResultHandled = false;
   onlineBotElo = parseInt(localStorage.getItem("onlineBotElo")) || 1500;
   showVSScreen(onlineAccount.name, onlineAccount.elo, botName, onlineOpponent.elo, () => {
@@ -1044,28 +1041,43 @@ async function handleOnlineResult(winnerName, change) {
 
   const won       = winnerName === onlineAccount.name;
   const eloChange = Math.round(change);
-  if (won) { onlineAccount.elo += eloChange; onlineAccount.wins++;   }
-  else     { onlineAccount.elo  = Math.max(100, onlineAccount.elo - eloChange); onlineAccount.losses++; }
+
+  // --- Spieler aktualisieren ---
+  if (won) { 
+    onlineAccount.elo += eloChange; 
+    onlineAccount.wins++;   
+  } else { 
+    onlineAccount.elo = Math.max(100, onlineAccount.elo - eloChange); 
+    onlineAccount.losses++; 
+  }
   saveAccountLocal();
   if (fbReady) pushAccountToFirebase();
 
   showEloAnimation(won ? eloChange : -eloChange);
   setTimeout(() => showWinnerOverlay(winnerName, won ? eloChange : -eloChange), 2600);
+
+  // --- Online Bot ELO aktualisieren ---
   if (onlineVsBot && onlineOpponent) {
+    if (won) {
+      onlineOpponent.elo = Math.max(100, onlineOpponent.elo - eloChange); // Bot verliert
+    } else {
+      onlineOpponent.elo += eloChange; // Bot gewinnt
+    }
     onlineBotElo = onlineOpponent.elo;
     localStorage.setItem("onlineBotElo", onlineBotElo);
-  }
-  if (fbReady) {
-    await dbSet("players/Online Bot", {
-      name: "Online Bot",
-      elo: onlineBotElo,
-      wins: 0,
-      losses: 0,
-      updatedAt: Date.now()
-    });
+
+    // In Firebase speichern (für Leaderboard)
+    if (fbReady) {
+      await dbSet("players/Online Bot", {
+        name: "Online Bot",
+        elo: onlineBotElo,
+        wins: 0,
+        losses: 0,
+        updatedAt: Date.now()
+      });
+    }
   }
 }
-
 
 function showWinnerOverlay(winnerName, eloChange) {
   document.getElementById("winnerText").innerHTML =
