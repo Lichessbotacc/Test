@@ -791,11 +791,10 @@ function startOnlineGame(matchData) {
   startTime = Date.now();
   onlineResultHandled = false;
 
-  // Both clients use the same seed → identical balls
+  // Beide Clients nutzen denselben Seed
   onlineRng           = makeLCG(matchData.seed || 42);
-  onlineSpawnInterval = (matchData.startBalls ? 5000 : spawnDelay);
-  const speedMult     = matchData.ballSpeedMult || ballSpeedMultiplier;
-  const startN        = matchData.startBalls    || startBallCount;
+  onlineSpawnInterval = 1000; // Fest auf 1 Sekunde eingestellt (1000ms)
+  const speedMult     = 0.5;  // Fest auf "Normal" (0.5) eingestellt
 
   document.getElementById("mode").textContent = "Online 1v1";
 
@@ -804,7 +803,6 @@ function startOnlineGame(matchData) {
   const myName   = onlineAccount.name;
   const oppName  = onlineOpponent.name;
 
-  // p1 always left, p2 always right — consistent for both clients
   const p1x = W() * 0.3, p2x = W() * 0.7, py = H() / 2;
   const meX  = onlineRole === "p1" ? p1x : p2x;
   const oppX = onlineRole === "p1" ? p2x : p1x;
@@ -813,47 +811,33 @@ function startOnlineGame(matchData) {
   const oppPlayer = createPlayer(oppX, py, oppColor, oppName);
   players.push(mePlayer, oppPlayer);
 
-  // Generate initial balls deterministically (same on both clients)
-  if (onlineIsHost) {
-  for (let i = 0; i < startN; i++) {
-    balls.push(makeOnlineBall(speedMult));
-  }
-    
-}
-  if (!onlineIsHost) {
-  balls = []; // Client wartet auf Host-State
-}
+  // Am Anfang starten wir mit 0 Bällen (kein Schleifen-Spawn beim Start)
   onlineBallSpawnTimer = Date.now();
 
-  // Show HUD
   document.getElementById("onlineNameMe").textContent  = myName;
   document.getElementById("onlineNameOpp").textContent = oppName;
   document.getElementById("onlineHUD").style.display   = "flex";
   document.getElementById("pingDisplay").style.display = "block";
-  document.getElementById("onlineHUD").style.display   = "flex";
-  document.getElementById("pingDisplay").style.display = "block";
 
   if (onlineIsHost) {
-    setInterval(pushBallState, 80);
+    // Erhöhte Sync-Frequenz (45ms statt 80ms) für ein flüssigeres Spielgefühl
+    setInterval(pushBallState, 45);
   }
-  // ── Firebase listener: opponent position + result ──
+
   const matchUnsub = dbOn("onlineMatches/" + onlineMatchId, (data) => {
     if (!data) return;
 
-    // Read opponent's position
     const oppRole = onlineRole === "p1" ? "p2" : "p1";
     const oppState = data[oppRole + "State"];
     if (oppState) {
       const op = players.find(p => p.name !== myName);
       if (op) {
-        // Interpolate towards received position
         op.tx    = oppState.x;
         op.ty    = oppState.y;
         op.alive = oppState.alive !== false;
       }
     }
 
-    // Read ball state (only if we're not host — host owns balls)
     if (!onlineIsHost && data.ballState) {
       try {
         const bs = JSON.parse(data.ballState);
@@ -861,7 +845,6 @@ function startOnlineGame(matchData) {
       } catch(e) {}
     }
 
-    // Handle game result
     if (data.status === "done" && data.winner && !onlineResultHandled) {
       handleOnlineResult(data.winner, data.eloChange || 10);
     }
@@ -878,12 +861,10 @@ function startOnlineGame(matchData) {
   });
   onlineUnsubscribes.push(matchUnsub);
 
-  // Mark match as active once both are ready
   dbUpdate("onlineMatches/" + onlineMatchId, {
     [onlineRole + "Ready"]: true
   }).catch(() => {});
 
-  // Ping interval
   const pingIv = setInterval(async () => {
     if (!running || mode !== "online") { clearInterval(pingIv); return; }
     const t0 = Date.now();
@@ -894,24 +875,29 @@ function startOnlineGame(matchData) {
   }, 3000);
 }
 
+
 // Make a ball using shared deterministic RNG
 function makeOnlineBall(speedMult) {
-  speedMult = speedMult || ballSpeedMultiplier;
+  // Ignoriere globale Einstellungen und setze Geschwindigkeit fest auf 0.5 (Normal)
+  speedMult = 0.5; 
   const rng = onlineRng || Math.random;
   const r   = 15 + rng() * 20;
   let x, y, valid = false, tries = 0;
-  const minDistance = 160; // Sicherer Abstand auch im Online-Match
+  const minDistance = 220; // Sicherer Spawn-Mindestabstand in Pixeln (riesiger Abstand)
   
   while (!valid && tries++ < 100) {
     x = r + rng() * (W() - r * 2);
     y = r + rng() * (H() - r * 2);
     valid = true;
+    
+    // Überprüfe den Abstand zu allen aktiven Spielern
     for (const p of players) {
       if (!p.alive) continue;
-      const dx = p.x - x, dy = p.y - y;
+      const dx = p.x - x;
+      const dy = p.y - y;
       if (Math.sqrt(dx*dx + dy*dy) < p.radius + r + minDistance) {
         valid = false;
-        break;
+        break; // Zu nah an einem Spieler, neuen Punkt suchen
       }
     }
   }
@@ -924,6 +910,7 @@ function makeOnlineBall(speedMult) {
     vy: Math.sin(ang) * spd * speedMult
   };
 }
+
 
 // Push my position (only position, not physics)
 let lastPosPush = 0;
