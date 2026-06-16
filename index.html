@@ -324,26 +324,21 @@ function H() { return V_H; }
 
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  const screenW = stage.clientWidth;
-  const screenH = stage.clientHeight;
 
-  // Uniform scale to fit the fixed virtual resolution into the screen (letterbox)
-  scale = Math.min(screenW / V_W, screenH / V_H);
+  // gameWrap und Canvas füllen nun immer den gesamten Bildschirm aus (kein schwarzer Rand)
+  gameWrap.style.width  = "100%";
+  gameWrap.style.height = "100%";
+  canvas.style.width    = "100%";
+  canvas.style.height   = "100%";
 
-  const cssW = V_W * scale;
-  const cssH = V_H * scale;
-
-  gameWrap.style.width  = cssW + "px";
-  gameWrap.style.height = cssH + "px";
-
-  canvas.style.width  = cssW + "px";
-  canvas.style.height = cssH + "px";
+  // Die interne Auflösung des Canvas-Backing-Stores bleibt fest bei 1280x720 (DPR-bereinigt)
   canvas.width  = Math.round(V_W * dpr);
   canvas.height = Math.round(V_H * dpr);
 
-  // Render in virtual-resolution coordinate space always
+  // Zeichnen erfolgt weiterhin im virtuellen 1280x720-Koordinatenraum
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
+
 
 function screenToVirtual(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
