@@ -545,9 +545,9 @@ async function loadLeaderboard() {
   try {
     const data = await dbGet("players");
     if (!data) { lbTable.innerHTML += '<div class="lb-row"><span>No players yet</span></div>'; return; }
-    Object.values(data).sort((a,b) => b.elo - a.elo).forEach((p, i) => {
+        Object.values(data).sort((a,b) => b.elo - a.elo).forEach((p, i) => {
       const isMe = onlineAccount && p.name === onlineAccount.name;
-      lbTable.innerHTML += `<div class="lb-row${isMe ? " lb-me" : ""}">
+      lbTable.innerHTML += `<div class="lb-row${isMe ? " lb-me" : ""}" style="cursor:pointer;" onclick="openOnlineProfile('${p.name}')">
         <span>#${i+1}</span><span>${p.name}</span>
         <span>${Math.round(p.elo)}</span>
         <span>${p.wins||0}/${p.losses||0}</span></div>`;
