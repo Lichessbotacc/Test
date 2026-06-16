@@ -75,7 +75,14 @@ button:hover{background:#555;}
   position:absolute;inset:0;display:none;flex-direction:column;
   justify-content:center;align-items:center;background:#111;color:white;z-index:30;
 }
-#menu{display:flex;}
+#menu {
+  display: flex;
+  overflow-y: auto;                  /* Erlaubt das Scrollen NUR in diesem Menü */
+  justify-content: flex-start;       /* Verhindert, dass der obere Titel beim Scrollen abgeschnitten wird */
+  padding: 60px 10px;                /* Gibt oben und unten einen schönen, sauberen Abstand beim Scrollen */
+  -webkit-overflow-scrolling: touch; /* Macht das Scrollen auf iPhones und iPads butterweich */
+}
+
 h1{font-size:50px;margin-bottom:20px;}
 h2{font-size:30px;margin-bottom:20px;}
 #gameOver{background:rgba(0,0,0,0.85);z-index:40;}
@@ -390,19 +397,95 @@ async function dbRemove(path)  { return window._firebaseRemove(dbRef(path)); }
 // ═══════════════════════════════════════════════
 //  ACCOUNT
 // ═══════════════════════════════════════════════
+function sanitizeAccount(acc) {
+  if (!acc) return null;
+  acc.elo = acc.elo ?? 1500;
+  acc.wins = acc.wins ?? 0;
+  acc.losses = acc.losses ?? 0;
+  acc.highestElo = acc.highestElo ?? acc.elo;
+  acc.lowestElo = acc.lowestElo ?? acc.elo;
+  acc.currentStreak = acc.currentStreak ?? 0;
+  acc.bestStreak = acc.bestStreak ?? 0;
+  acc.totalEloGained = acc.totalEloGained ?? 0;
+  acc.totalEloLost = acc.totalEloLost ?? 0;
+  acc.bestWinChange = acc.bestWinChange ?? 0;
+  acc.bestWinOpp = acc.bestWinOpp ?? "";
+  acc.worstLossChange = acc.worstLossChange ?? 0;
+  acc.worstLossOpp = acc.worstLossOpp ?? "";
+  return acc;
+}
+
 let onlineAccount = null;
-try { onlineAccount = JSON.parse(localStorage.getItem("dobAccount") || "null"); } catch(e) {}
+try { 
+  onlineAccount = JSON.parse(localStorage.getItem("dobAccount") || "null"); 
+  if (onlineAccount) onlineAccount = sanitizeAccount(onlineAccount);
+} catch(e) {}
 
 function saveAccountLocal() {
   if (onlineAccount) localStorage.setItem("dobAccount", JSON.stringify(onlineAccount));
 }
+
+// FIX: never blindly overwrite Firebase with the local account snapshot.
+// Local state (e.g. after clearing localStorage, or using a different
+// browser/device) can be "behind" what's already stored online. We first
+// pull the remote record and merge: running totals are summed, "best of"
+// fields (highestElo, bestStreak, bestWinChange, ...) take the max of
+// local vs remote, so historical stats are never lost or reset.
 async function pushAccountToFirebase() {
   if (!fbReady || !onlineAccount) return;
+
+  let remote = null;
+  try { remote = await dbGet("players/" + onlineAccount.name); } catch(e) {}
+
+  if (remote) {
+    // Counters that should never go backwards from what's already stored.
+    onlineAccount.wins            = Math.max(onlineAccount.wins ?? 0,            remote.wins ?? 0);
+    onlineAccount.losses          = Math.max(onlineAccount.losses ?? 0,          remote.losses ?? 0);
+    onlineAccount.totalEloGained  = Math.max(onlineAccount.totalEloGained ?? 0,  remote.totalEloGained ?? 0);
+    onlineAccount.totalEloLost    = Math.max(onlineAccount.totalEloLost ?? 0,    remote.totalEloLost ?? 0);
+    onlineAccount.bestStreak      = Math.max(onlineAccount.bestStreak ?? 0,      remote.bestStreak ?? 0);
+
+    // "Best win" / "worst loss": keep whichever change value is larger,
+    // along with its matching opponent name.
+    if ((remote.bestWinChange ?? 0) > (onlineAccount.bestWinChange ?? 0)) {
+      onlineAccount.bestWinChange = remote.bestWinChange;
+      onlineAccount.bestWinOpp    = remote.bestWinOpp;
+    }
+    if ((remote.worstLossChange ?? 0) > (onlineAccount.worstLossChange ?? 0)) {
+      onlineAccount.worstLossChange = remote.worstLossChange;
+      onlineAccount.worstLossOpp    = remote.worstLossOpp;
+    }
+
+    // Highest/lowest ELO ever reached: max/min across local and remote.
+    onlineAccount.highestElo = Math.max(onlineAccount.highestElo ?? onlineAccount.elo, remote.highestElo ?? remote.elo ?? onlineAccount.elo);
+    onlineAccount.lowestElo  = Math.min(onlineAccount.lowestElo  ?? onlineAccount.elo, remote.lowestElo  ?? remote.elo ?? onlineAccount.elo);
+
+    // currentStreak and elo itself reflect the most recent match result,
+    // which only ever happens locally (this client just played the game),
+    // so we keep the local value for those.
+  }
+
+  saveAccountLocal();
+
   await dbSet("players/" + onlineAccount.name, {
-    name: onlineAccount.name, elo: onlineAccount.elo,
-    wins: onlineAccount.wins, losses: onlineAccount.losses, updatedAt: Date.now()
+    name: onlineAccount.name,
+    elo: onlineAccount.elo,
+    wins: onlineAccount.wins,
+    losses: onlineAccount.losses,
+    highestElo: onlineAccount.highestElo,
+    lowestElo: onlineAccount.lowestElo,
+    currentStreak: onlineAccount.currentStreak,
+    bestStreak: onlineAccount.bestStreak,
+    totalEloGained: onlineAccount.totalEloGained,
+    totalEloLost: onlineAccount.totalEloLost,
+    bestWinChange: onlineAccount.bestWinChange,
+    bestWinOpp: onlineAccount.bestWinOpp,
+    worstLossChange: onlineAccount.worstLossChange,
+    worstLossOpp: onlineAccount.worstLossOpp,
+    updatedAt: Date.now()
   });
 }
+
 
 // ═══════════════════════════════════════════════
 //  SETTINGS
@@ -481,19 +564,15 @@ function confirmHome() {
 }
 
 function exitToMenu() {
-  running = false;
-  clearAllTimers();
+  // 1. Wichtiges Online-Cleanup starten (löscht dich z. B. aus der Warteschlange)
   cleanupOnline();
-  balls = []; players = []; eliminated = []; matches = []; coins = [];
-  document.getElementById("eloTable").style.display      = "none";
-  document.getElementById("coinHUD").style.display       = "none";
-  document.getElementById("opponentInfo").style.display  = "none";
-  document.getElementById("spectatorInfo").style.display = "none";
-  document.getElementById("winnerOverlay").style.display = "none";
-  document.getElementById("pingDisplay").style.display   = "none";
-  document.getElementById("onlineHUD").style.display     = "none";
-  showScreen("menu");
+  
+  // 2. 150ms warten, damit Firebase die Daten senden kann, dann neu laden
+  setTimeout(() => {
+    window.location.reload();
+  }, 150);
 }
+
 
 function clearAllTimers() {
   if (spawnTimeoutId)     { clearTimeout(spawnTimeoutId);      spawnTimeoutId     = null; }
@@ -541,18 +620,62 @@ function showEloAnimation(change) {
 async function loadLeaderboard() {
   const lbTable = document.getElementById("lbTable");
   lbTable.innerHTML = '<div class="lb-row"><span>Rank</span><span>Name</span><span>ELO</span><span>W/L</span></div>';
-  if (!fbReady) { lbTable.innerHTML += '<div class="lb-row"><span>Firebase not connected</span></div>'; return; }
+  if (!fbReady) { lbTable.innerHTML += '<div class="lb-row"><span>Firebase nicht verbunden</span></div>'; return; }
   try {
     const data = await dbGet("players");
-    if (!data) { lbTable.innerHTML += '<div class="lb-row"><span>No players yet</span></div>'; return; }
-        Object.values(data).sort((a,b) => b.elo - a.elo).forEach((p, i) => {
+    if (!data) { lbTable.innerHTML += '<div class="lb-row"><span>Keine Spieler</span></div>'; return; }
+    Object.values(data).sort((a,b) => b.elo - a.elo).forEach((p, i) => {
       const isMe = onlineAccount && p.name === onlineAccount.name;
       lbTable.innerHTML += `<div class="lb-row${isMe ? " lb-me" : ""}" style="cursor:pointer;" onclick="openOnlineProfile('${p.name}')">
         <span>#${i+1}</span><span>${p.name}</span>
         <span>${Math.round(p.elo)}</span>
         <span>${p.wins||0}/${p.losses||0}</span></div>`;
     });
-  } catch(e) { lbTable.innerHTML += '<div class="lb-row"><span>Error loading</span></div>'; }
+  } catch(e) { lbTable.innerHTML += '<div class="lb-row"><span>Fehler beim Laden</span></div>'; }
+}
+
+async function openOnlineProfile(name) {
+  if (!fbReady) return;
+  try {
+    const p = await dbGet("players/" + name);
+    if (!p) {
+      alert("Profil nicht gefunden.");
+      return;
+    }
+
+    const wins = p.wins ?? 0;
+    const losses = p.losses ?? 0;
+    const totalGames = wins + losses;
+    const winrate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
+
+    document.getElementById("profileName").innerHTML = 
+      `<span style="color:${name === "Online Bot" ? "#ffaa00" : "#00ff88"}">${p.name}</span>`;
+
+    document.getElementById("profileStats").innerHTML = `
+      <div class="prof-row"><span class="prof-label">Elo</span><span class="prof-val">${Math.round(p.elo)}</span></div>
+      <div class="prof-row"><span class="prof-label">Total Games</span><span class="prof-val">${totalGames}</span></div>
+      <div class="prof-row"><span class="prof-label">Wins</span><span class="prof-val" style="color:#00ff88">${wins}</span></div>
+      <div class="prof-row"><span class="prof-label">Losses</span><span class="prof-val" style="color:#ff4444">${losses}</span></div>
+      <div class="prof-row"><span class="prof-label">Winrate</span><span class="prof-val">${winrate}%</span></div>
+      
+      <div class="prof-row"><span class="prof-label">Highest Elo</span><span class="prof-val" style="color:#00ff88">${Math.round(p.highestElo ?? p.elo)}</span></div>
+      <div class="prof-row"><span class="prof-label">Lowest Elo</span><span class="prof-val" style="color:#ff4444">${Math.round(p.lowestElo ?? p.elo)}</span></div>
+      
+      <div class="prof-row"><span class="prof-label">Longest Winstreak</span><span class="prof-val">${p.bestStreak ?? 0}</span></div>
+      <div class="prof-row"><span class="prof-label">Current Winstreak</span><span class="prof-val">${p.currentStreak ?? 0}</span></div>
+      
+      <div class="prof-row"><span class="prof-label">Best Win</span><span class="prof-val" style="color:#00ff88">+${p.bestWinChange ?? 0} vs ${p.bestWinOpp || "-"}</span></div>
+      <div class="prof-row"><span class="prof-label">Worst Loss</span><span class="prof-val" style="color:#ff4444">-${p.worstLossChange ?? 0} vs ${p.worstLossOpp || "-"}</span></div>
+      
+      <div class="prof-row"><span class="prof-label">Total Elo Won</span><span class="prof-val" style="color:#00ff88">+${p.totalEloGained ?? 0}</span></div>
+      <div class="prof-row"><span class="prof-label">Total Elo Loss</span><span class="prof-val" style="color:#ff4444">-${p.totalEloLost ?? 0}</span></div>
+    `;
+
+    document.getElementById("profileModal").style.display = "flex";
+  } catch(e) {
+    console.warn("Fehler beim Laden des Profils", e);
+    alert("Fehler beim Laden des Profils.");
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -749,7 +872,6 @@ async function tryMatchmake() {
 }
 
 // FIX #3: weak AI bot fallback opponent after 30s of searching
-// FIX #3: weak AI bot fallback opponent after 30s of searching
 function startBotMatch() {
   if (onlineMatchId) return;
   if (onlineSearchInterval) { 
@@ -770,45 +892,32 @@ function startBotMatch() {
 
   onlineOpponent = {
     name: "Online Bot",
-    elo: onlineBotElo || 1500,
-    wins: 0,
-    losses: 0,
-    highestElo: 1500,
-    lowestElo: 1500,
-    currentStreak: 0,
-    bestStreak: 0,
-    totalEloGained: 0,
-    totalEloLost: 0,
-    bestWinChange: 0,
-    bestWinOpp: "",
-    worstLossChange: 0,
-    worstLossOpp: "",
-    skill: 0.30
+    elo: onlineBotElo,
+    skill: 0.40
   };
 
   onlineResultHandled = false;
 
-  // === ALLE HISTORISCHEN DATEN LADEN ===
+  // === WICHTIG: Bot-Stats aus Firebase laden ===
   if (fbReady) {
     dbGet("players/Online Bot").then(data => {
       if (data) {
-        onlineOpponent.elo            = data.elo ?? onlineOpponent.elo;
-        onlineOpponent.wins           = data.wins ?? 0;
-        onlineOpponent.losses         = data.losses ?? 0;
-        onlineOpponent.highestElo     = data.highestElo ?? onlineOpponent.elo;
-        onlineOpponent.lowestElo      = data.lowestElo ?? onlineOpponent.elo;
-        onlineOpponent.currentStreak  = data.currentStreak ?? 0;
-        onlineOpponent.bestStreak     = data.bestStreak ?? 0;
-        onlineOpponent.totalEloGained = data.totalEloGained ?? 0;
-        onlineOpponent.totalEloLost   = data.totalEloLost ?? 0;
-        onlineOpponent.bestWinChange  = data.bestWinChange ?? 0;
-        onlineOpponent.bestWinOpp     = data.bestWinOpp ?? "";
-        onlineOpponent.worstLossChange= data.worstLossChange ?? 0;
-        onlineOpponent.worstLossOpp   = data.worstLossOpp ?? "";
+        onlineOpponent.elo    = data.elo    || onlineBotElo;
+        onlineOpponent.wins   = data.wins   || 0;
+        onlineOpponent.losses = data.losses || 0;
+      } else {
+        onlineOpponent.wins   = 0;
+        onlineOpponent.losses = 0;
       }
       onlineBotElo = onlineOpponent.elo;
       localStorage.setItem("onlineBotElo", onlineBotElo);
-    }).catch(() => {});
+    }).catch(() => {
+      onlineOpponent.wins   = 0;
+      onlineOpponent.losses = 0;
+    });
+  } else {
+    onlineOpponent.wins   = 0;
+    onlineOpponent.losses = 0;
   }
 
   showVSScreen(
@@ -916,15 +1025,19 @@ function startOnlineGame(matchData) {
   oppPlayer.tx = oppX;
   oppPlayer.ty = py;
 
-  if (onlineVsBot) {
-    // Weak bot: low skill stats so it's an easy fallback opponent
-    const s = 0.50;
+      if (onlineVsBot) {
+    // Fester Skill-Wert (s = 0.30) wie im Original, aber mit den echten Offline-Formeln
+    const s = 0.20; 
+
     oppPlayer.skill      = { aim:s, reaction:s, movement:s, awareness:s, aggression:s };
-    oppPlayer.speed      = 1.2 + s * 3;
-    oppPlayer.awareness  = 60  + s * 80;
-    oppPlayer.dodgePower = 0.3 + s * 1.2;
-    oppPlayer.randomness = (1 - s) * 5;
+    oppPlayer.speed      = 2.5  + s * 8;
+    oppPlayer.reaction   = 2    + s * 6;
+    oppPlayer.awareness  = 80   + s * 100;
+    oppPlayer.dodgePower = 0.5  + s * 3.5;
+    oppPlayer.randomness = (1 - s) * 4;
   }
+
+
 
   players.push(mePlayer, oppPlayer);
 
@@ -1096,71 +1209,71 @@ async function handleOnlineResult(winnerName, change) {
 
   const won       = winnerName === onlineAccount.name;
   const eloChange = Math.round(change);
+  const oppName   = onlineOpponent ? onlineOpponent.name : "Online Bot";
 
-  // --- Spieler aktualisieren ---
+  onlineAccount = sanitizeAccount(onlineAccount);
+
   if (won) { 
     onlineAccount.elo += eloChange; 
-    onlineAccount.wins++;   
+    onlineAccount.wins++;
+    onlineAccount.currentStreak++;
+    if (onlineAccount.currentStreak > onlineAccount.bestStreak) {
+      onlineAccount.bestStreak = onlineAccount.currentStreak;
+    }
+    onlineAccount.totalEloGained += eloChange;
+
+    if (onlineAccount.elo > onlineAccount.highestElo) {
+      onlineAccount.highestElo = onlineAccount.elo;
+    }
+
+    if (eloChange > onlineAccount.bestWinChange) {
+      onlineAccount.bestWinChange = eloChange;
+      onlineAccount.bestWinOpp = oppName;
+    }
   } else { 
     onlineAccount.elo = Math.max(100, onlineAccount.elo - eloChange); 
-    onlineAccount.losses++; 
+    onlineAccount.losses++;
+    onlineAccount.currentStreak = 0;
+    onlineAccount.totalEloLost += eloChange;
+
+    if (onlineAccount.elo < onlineAccount.lowestElo) {
+      onlineAccount.lowestElo = onlineAccount.elo;
+    }
+
+    if (eloChange > onlineAccount.worstLossChange) {
+      onlineAccount.worstLossChange = eloChange;
+      onlineAccount.worstLossOpp = oppName;
+    }
   }
   saveAccountLocal();
-  if (fbReady) pushAccountToFirebase();
+  if (fbReady) await pushAccountToFirebase();
 
   showEloAnimation(won ? eloChange : -eloChange);
   setTimeout(() => showWinnerOverlay(winnerName, won ? eloChange : -eloChange), 2600);
 
-  // --- Online Bot Stats aktualisieren ---
-    if (onlineVsBot && onlineOpponent) {
+  if (onlineVsBot && onlineOpponent) {
     if (won) {
-      // Spieler gewinnt → Bot verliert
       onlineOpponent.elo = Math.max(100, onlineOpponent.elo - eloChange);
-      onlineOpponent.losses = (onlineOpponent.losses || 0) + 1;
-      onlineOpponent.currentStreak = 0;
-      onlineOpponent.totalEloLost = (onlineOpponent.totalEloLost || 0) + eloChange;
-      if (onlineOpponent.elo < (onlineOpponent.lowestElo || 1500)) {
-        onlineOpponent.lowestElo = onlineOpponent.elo;
-      }
+      if (!onlineOpponent.losses) onlineOpponent.losses = 0;
+      onlineOpponent.losses++;
     } else {
-      // Bot gewinnt → Spieler verliert
       onlineOpponent.elo += eloChange;
-      onlineOpponent.wins = (onlineOpponent.wins || 0) + 1;
-      onlineOpponent.currentStreak = (onlineOpponent.currentStreak || 0) + 1;
-      if (onlineOpponent.currentStreak > (onlineOpponent.bestStreak || 0)) {
-        onlineOpponent.bestStreak = onlineOpponent.currentStreak;
-      }
-      onlineOpponent.totalEloGained = (onlineOpponent.totalEloGained || 0) + eloChange;
-      if (onlineOpponent.elo > (onlineOpponent.highestElo || 1500)) {
-        onlineOpponent.highestElo = onlineOpponent.elo;
-      }
+      if (!onlineOpponent.wins) onlineOpponent.wins = 0;
+      onlineOpponent.wins++;
     }
-
     onlineBotElo = onlineOpponent.elo;
     localStorage.setItem("onlineBotElo", onlineBotElo);
-
-    // ALLE Daten speichern
     if (fbReady) {
       await dbSet("players/Online Bot", {
-        name: "Online Bot",
-        elo: onlineBotElo,
-        wins: onlineOpponent.wins || 0,
-        losses: onlineOpponent.losses || 0,
-        highestElo: onlineOpponent.highestElo || onlineBotElo,
-        lowestElo: onlineOpponent.lowestElo || onlineBotElo,
-        currentStreak: onlineOpponent.currentStreak || 0,
-        bestStreak: onlineOpponent.bestStreak || 0,
-        totalEloGained: onlineOpponent.totalEloGained || 0,
-        totalEloLost: onlineOpponent.totalEloLost || 0,
-        bestWinChange: onlineOpponent.bestWinChange || 0,
-        bestWinOpp: onlineOpponent.bestWinOpp || "",
-        worstLossChange: onlineOpponent.worstLossChange || 0,
-        worstLossOpp: onlineOpponent.worstLossOpp || "",
+        name: "Online Bot", elo: onlineBotElo,
+        wins: onlineOpponent.wins || 0, losses: onlineOpponent.losses || 0,
         updatedAt: Date.now()
       });
     }
   }
 }
+
+
 function showWinnerOverlay(winnerName, eloChange) {
   document.getElementById("winnerText").innerHTML =
     `🏆 Winner: <span style="color:gold">${winnerName}</span>`;
@@ -1710,23 +1823,28 @@ function update() {
 // ── Online collision: only check local player, report result ──
 function checkOnlineCollision(me) {
   for (const b of balls) {
-    const dx = me.x - b.x, dy = me.y - b.y;
+    const dx = me.x - b.x;
+    const dy = me.y - b.y;
     if (Math.sqrt(dx*dx + dy*dy) < me.radius + b.radius) {
       me.alive = false;
       const opp = players.find(p => p.name !== me.name);
 
       if (onlineVsBot) {
-        // Local result, no network round trip needed
-        const diff   = Math.abs(onlineAccount.elo - (onlineOpponent?.elo || 1200));
-        const change = Math.max(1, Math.min(8, Math.round(3 + diff / 150))); // smaller swing vs bot
+        // Du verlierst gegen den Bot (Winner = Bot (oppElo), Loser = Du (onlineAccount.elo))
+        const oppElo = onlineOpponent?.elo || 1500;
+        const diff = onlineAccount.elo - oppElo; // loserElo - winnerElo
+        const change = Math.max(1, Math.min(15, Math.round(5 + diff / 100)));
+        
         handleOnlineResult(opp ? opp.name : "", change);
       } else {
+        // Echtes Online-Match meldet das Ergebnis an die DB
         reportOnlineResult(opp ? opp.name : "", me.name);
       }
       return;
     }
   }
 }
+
 // Bot collision in vs Bot mode
 // Bot collision in vs Bot mode
 function checkBotCollision(bot) {
@@ -1738,8 +1856,10 @@ function checkBotCollision(bot) {
       const me = players.find(p => p.name === onlineAccount.name);
       
       if (me && me.alive) {
-        // Gleiche ELO-Berechnung wie bei echten Gegnern
-        const diff   = Math.abs(onlineAccount.elo - (onlineOpponent?.elo || 1500));
+        const oppElo = onlineOpponent?.elo || 1500;
+        
+        // Du gewinnst (Winner = Du (onlineAccount.elo), Loser = Bot (oppElo))
+        const diff = oppElo - onlineAccount.elo; // loserElo - winnerElo
         const change = Math.max(1, Math.min(15, Math.round(5 + diff / 100)));
         
         handleOnlineResult(me.name, change);
@@ -1748,6 +1868,8 @@ function checkBotCollision(bot) {
     }
   }
 }
+
+
 function updateTournament() {
   for (const match of [...matches]) {
     if (match.running) updateMatch(match);
@@ -1814,7 +1936,15 @@ function checkCollision(p) {
 async function reportOnlineResult(winnerName, loserName) {
   if (onlineResultHandled) return;
 
-  const diff   = Math.abs(onlineAccount.elo - (onlineOpponent?.elo || 1500));
+  const me = onlineAccount;
+  const opp = onlineOpponent || { elo: 1500 };
+
+  // ELOs für Gewinner und Verlierer bestimmen
+  const winnerElo = (winnerName === me.name) ? me.elo : opp.elo;
+  const loserElo = (loserName === me.name) ? me.elo : opp.elo;
+
+  // Genau wie im Offline-Turnier (finishMatch)
+  const diff = loserElo - winnerElo;
   const change = Math.max(1, Math.min(15, Math.round(5 + diff / 100)));
 
   if (fbReady && onlineMatchId) {
@@ -1830,9 +1960,30 @@ async function reportOnlineResult(winnerName, loserName) {
   }
 }
 
+
+
 // ═══════════════════════════════════════════════
 //  TOURNAMENT FINISH
 // ═══════════════════════════════════════════════
+// Returns the id of whichever tournament match is currently visible on
+// screen — either the player's own active match, or (in TV/spectate mode)
+// the match being followed. Mirrors the selection logic in draw().
+function renderedMatchId() {
+  if (spectateModeActive && spectateMatchId) {
+    const m = matches.find(m => m.id === spectateMatchId && m.running);
+    if (m) return m.id;
+  }
+  if (!humanRemovedFromQueue) {
+    const dm = playerMatchMap.get("YOU");
+    if (dm && dm.running) return dm.id;
+  }
+  if (spectateModeActive) {
+    const m = matches.find(m => m.running);
+    if (m) return m.id;
+  }
+  return null;
+}
+
 function finishMatch(match, winner, loser) {
   match.running = false;
   const diff   = loser.elo - winner.elo;
@@ -1863,7 +2014,14 @@ function finishMatch(match, winner, loser) {
   if (winner.name === "YOU") showEloAnimation(change);
   if (loser.name  === "YOU") showEloAnimation(-change);
 
-  matchBanner = { text: "🏆 Winner: " + winner.name, ts: Date.now(), duration: 2500 };
+  // FIX: only show the winner banner if this specific match is the one
+  // actually being rendered right now (the player's own match, or the
+  // match currently being spectated in TV mode). Otherwise a random
+  // bot-vs-bot match finishing elsewhere would pop up a banner that has
+  // nothing to do with what's on screen.
+  if (renderedMatchId() === match.id) {
+    matchBanner = { text: "🏆 Winner: " + winner.name, ts: Date.now(), duration: 2500 };
+  }
 
   setTimeout(() => {
     if (humanRemovedFromQueue) {
