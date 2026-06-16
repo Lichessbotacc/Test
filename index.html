@@ -749,7 +749,6 @@ async function tryMatchmake() {
 }
 
 // FIX #3: weak AI bot fallback opponent after 30s of searching
-// FIX #3: weak AI bot fallback opponent after 30s of searching
 function startBotMatch() {
   if (onlineMatchId) return;
   if (onlineSearchInterval) { 
@@ -767,19 +766,37 @@ function startBotMatch() {
   onlineMatchId  = "BOT__" + Date.now();
   onlineRole     = "p1";
   onlineIsHost   = true;
+
   onlineOpponent = {
     name: "Online Bot",
     elo: onlineBotElo,
     skill: 0.30
   };
+
   onlineResultHandled = false;
-    onlineBotElo = parseInt(localStorage.getItem("onlineBotElo")) || 1500;
 
-  // Bot Stats initialisieren / laden
-  onlineOpponent.wins = onlineOpponent.wins || 0;
-  onlineOpponent.losses = onlineOpponent.losses || 0;
+  // === WICHTIG: Bot-Stats aus Firebase laden ===
+  if (fbReady) {
+    dbGet("players/Online Bot").then(data => {
+      if (data) {
+        onlineOpponent.elo    = data.elo    || onlineBotElo;
+        onlineOpponent.wins   = data.wins   || 0;
+        onlineOpponent.losses = data.losses || 0;
+      } else {
+        onlineOpponent.wins   = 0;
+        onlineOpponent.losses = 0;
+      }
+      onlineBotElo = onlineOpponent.elo;
+      localStorage.setItem("onlineBotElo", onlineBotElo);
+    }).catch(() => {
+      onlineOpponent.wins   = 0;
+      onlineOpponent.losses = 0;
+    });
+  } else {
+    onlineOpponent.wins   = 0;
+    onlineOpponent.losses = 0;
+  }
 
-  // WICHTIG: Hier immer "Online Bot" als Namen verwenden
   showVSScreen(
     onlineAccount.name, 
     onlineAccount.elo, 
