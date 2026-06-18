@@ -207,12 +207,6 @@ input[type=text],input[type=number]{
       <button onclick="startGame('coin')">🪙 Coin Hunt</button>
       <button onclick="startGame('survival')">💀 Survival Gauntlet</button>
       <button onclick="startGame('mirror')">🪞 Mirror Duel</button>
-      <button onclick="startGame('speedrun')">⏱️ Speedrun</button>
-<button onclick="startGame('team')">🔴🔵 Team Deathmatch</button>
-<button onclick="startGame('zombie')">🧟 Zombie Survival</button>
-<button onclick="startGame('boss')">👹 Boss Fight</button>
-<button onclick="startGame('puzzle')">🧩 Puzzle Challenge</button>
-
       <button onclick="showScreen('leaderboardScreen');loadLeaderboard()">🏆 Leaderboard</button>
       <button onclick="openSettings()">Settings</button>
     </div>
@@ -1514,90 +1508,6 @@ function updateAI(p, activeBalls) {
   p.y = Math.max(p.radius, Math.min(H()-p.radius, p.y));
   p.lastVX = vx; p.lastVY = vy;
 }
-// ── ADVANCED AI FOR ALL MODES ──
-function updateAIAdvanced(p, activeBalls) {
-  if (!p.alive) return;
-  
-  switch(mode) {
-    case "coin":
-      updateAICoin(p);
-      break;
-    case "survival":
-      updateAISurvival(p, activeBalls);
-      break;
-    case "mirror":
-      updateAIMirror(p);
-      break;
-    default:
-      updateAIDefault(p, activeBalls);
-  }
-}
-
-function updateAICoin(p) {
-  let nearestCoin = null;
-  let minDist = Infinity;
-  
-  for (const c of coins) {
-    const dx = p.x - c.x, dy = p.y - c.y;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist < minDist && dist < p.awareness) {
-      minDist = dist;
-      nearestCoin = c;
-    }
-  }
-  
-  if (nearestCoin) {
-    p.targetX = nearestCoin.x;
-    p.targetY = nearestCoin.y;
-  }
-}
-
-function updateAISurvival(p, activeBalls) {
-  let mostDangerous = null;
-  let dangerLevel = 0;
-  
-  for (const b of activeBalls) {
-    const dx = p.x - b.x, dy = p.y - b.y;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    const danger = (p.awareness - dist) / p.awareness;
-    
-    if (danger > dangerLevel) {
-      dangerLevel = danger;
-      mostDangerous = b;
-    }
-  }
-  
-  if (mostDangerous && dangerLevel > 0.3) {
-    // Ausweichen
-    const escapeX = p.x - mostDangerous.x;
-    const escapeY = p.y - mostDangerous.y;
-    const length = Math.sqrt(escapeX*escapeX + escapeY*escapeY) || 1;
-    p.targetX = p.x + (escapeX/length) * 200;
-    p.targetY = p.y + (escapeY/length) * 200;
-  }
-}
-
-function updateAIMirror(p) {
-  if (p.name === "MIRROR") {
-    const player = players.find(pl => pl.name === "YOU");
-    if (player) {
-      p.movementQueue.push({x: player.x, y: player.y, time: Date.now()});
-      
-      // Alte Bewegungen bereinigen
-      const now = Date.now();
-      while (p.movementQueue.length > 0 && 
-             now - p.movementQueue[0].time > p.mirrorDelay + 100) {
-        p.movementQueue.shift();
-      }
-      
-      if (p.movementQueue.length > 0) {
-        const target = p.movementQueue[0];
-        p.targetX = target.x;
-        p.targetY = target.y;
-      }
-    }
-  }
-}
 
 // ═══════════════════════════════════════════════
 //  PLAYER FACTORY
@@ -1705,227 +1615,38 @@ function startCoinMode() {
 //  SURVIVAL
 // ═══════════════════════════════════════════════
 function startSurvivalMode() {
-  mode = "survival";
-  survivalWave = 1;
-  survivalTime = 0;
+  mode = "survival"; survivalWave = 1;
   players = [];
-  
-  // Spieler + adaptive Bots
-  const me = createPlayer(W()/2, H()/2, "#00ff88", "SURVIVOR", true);
-  me.survivalBonus = 1.0;
-  players.push(me);
-  
-  for (let i = 0; i < 8; i++) {
-    const bot = createPlayer(
-      Math.random() * W(),
-      Math.random() * H(),
-      `hsl(${i*45}, 70%, 50%)`,
-      `SURV${i+1}`,
-      false
-    );
-    bot.survivalBonus = 0.5 + Math.random() * 0.5;
-    bot.speed *= bot.survivalBonus;
-    bot.awareness *= bot.survivalBonus;
-    players.push(bot);
-  }
-  
-  startNextWave();
-}
-
-function startNextWave() {
-  survivalWave++;
-  const ballCount = 3 + survivalWave * 2;
-  
-  // Bälle mit steigender Schwierigkeit
-  for (let i = 0; i < ballCount; i++) {
-    const ball = makeBallAt(players);
-    ball.speedMultiplier = 0.5 + (survivalWave * 0.05);
-    ball.vx *= ball.speedMultiplier;
-    ball.vy *= ball.speedMultiplier;
-    balls.push(ball);
-  }
-  
-  // Power-Ups spawnen
-  if (survivalWave % 3 === 0) {
-    spawnPowerUp();
-  }
-  
-  // UI Update
-  document.getElementById("mode").textContent = `Survival Wave ${survivalWave}`;
-}
-function startSpeedrunMode() {
-  mode = "speedrun";
-  speedrunStart = Date.now();
-  speedrunCheckpoints = [];
-  
-  players = [createPlayer(W()/2, H()/2, "#00ff88", "SPEEDRUNNER", true)];
-  
-  // Zeitlimit: 2 Minuten
-  speedrunTimeLimit = 120000;
-  
-  // Checkpoints platziert
-  for (let i = 0; i < 5; i++) {
-    speedrunCheckpoints.push({
-      x: 100 + i * 250,
-      y: 100 + Math.random() * (H() - 200),
-      radius: 30,
-      collected: false
-    });
-  }
-}
-function startTeamMode() {
-  mode = "team";
-  teams = {
-    red: { players: [], score: 0, color: "#ff4444" },
-    blue: { players: [], score: 0, color: "#4444ff" }
-  };
-  
-  // 4vs4 mit KI-Teamkollegen
-  for (let i = 0; i < 8; i++) {
-    const isRed = i < 4;
-    const team = isRed ? teams.red : teams.blue;
-    const player = createPlayer(
-      isRed ? W() * 0.25 : W() * 0.75,
-      H() * (0.2 + (i % 4) * 0.2),
-      team.color,
-      `${isRed ? "RED" : "BLUE"}${(i % 4) + 1}`,
-      i === 0 // Erster Spieler ist human
-    );
-    player.team = isRed ? "red" : "blue";
-    player.isTeammate = true;
-    team.players.push(player);
-    players.push(player);
-  }
-}
-function startZombieMode() {
-  mode = "zombie";
-  players = [createPlayer(W()/2, H()/2, "#00ff88", "SURVIVOR")];
-  
-  // Zombie Bots
-  for (let i = 0; i < 8; i++) {
-    const zombie = createPlayer(
-      Math.random() * W(),      // HIER FEHLTE DIE KLAMMER: Math.random() statt Math.random
-      Math.random() * H(),      // HIER FEHLTE DIE KLAMMER: Math.random() statt Math.random
-      "#44aa44",
-      `ZOMBIE${i+1}`
-    );
-    zombie.isZombie = true;
-    zombie.speed = 1.8;
-    zombie.awareness = 400;
-    players.push(zombie);
-  }
-  
-  document.getElementById("mode").textContent = "Zombie Survival";
-  startGameCommon();
-}
-
-function startBossMode() {
-  mode = "boss";
-  
-  players = [createPlayer(W()/2, H()/2, "#00ff88", "HERO", true)];
-  
-  // Mega-Boss mit Phasen
-  boss = {
-    x: W()/2,
-    y: 150,
-    radius: 80,
-    health: 1000,
-    maxHealth: 1000,
-    phase: 1,
-    attacks: [],
-    color: "#aa00aa",
-    name: "MEGA_BOSS"
-  };
-  
-  // Boss-Angriffsmuster
-  boss.attacks = [
-    { type: "circle", cooldown: 3000, lastUsed: 0 },
-    { type: "spiral", cooldown: 5000, lastUsed: 0 },
-    { type: "homing", cooldown: 8000, lastUsed: 0 }
-  ];
-}
-
-function startPuzzleMode() {
-  mode = "puzzle";
-  puzzleLevel = 1;
-  puzzleSolved = false;
-  
-  players = [createPlayer(50, H()/2, "#00ff88", "SOLVER", true)];
-  
-  // Dynamische Hindernisse
-  obstacles = [];
-  
-  // Level 1: Labyrinth
-  for (let i = 0; i < 8; i++) {
-    obstacles.push({
-      x: 200 + i * 80,
-      y: 100 + (i % 3) * 150,
-      width: 60,
-      height: 200,
-      rotating: i % 2 === 0
-    });
-  }
-  
-  // Zielpunkt
-  goal = {
-    x: W() - 100,
-    y: H()/2,
-    radius: 40,
-    color: "#00ff00"
-  };
+  players.push(createPlayer(W()/2, H()/2, "#00ff88", "Player"));
+  for (let i = 0; i < aiBotCount; i++)
+    players.push(createPlayer(Math.random()*W(), Math.random()*H(),
+      `hsl(${i*360/aiBotCount},100%,50%)`, "Bot "+(i+1)));
+  for (let i = 0; i < startBallCount; i++) createBall();
+  survivalIntervalId = setInterval(() => {
+    if (!running) { clearInterval(survivalIntervalId); survivalIntervalId = null; return; }
+    survivalWave++;
+    const count = Math.floor(survivalWave / 2) + 1;
+    for (let i = 0; i < count; i++) createBall();
+  }, 10000);
 }
 
 // ═══════════════════════════════════════════════
 //  MIRROR DUEL
 // ═══════════════════════════════════════════════
 function startMirrorMode() {
-  mode = "mirror";
-  players = [];
-  const me = createPlayer(W() * 0.3, H() / 2, "#00ff88", "YOU", true);
-  const mirror = createPlayer(W() * 0.7, H() / 2, "#ff88aa", "MIRROR", false);
-  
-  // Spiegel kopiert Bewegungen mit 0.3s Verzögerung
-  mirror.isMirror = true;
-  mirror.mirrorDelay = 300; // ms
-  mirror.movementQueue = [];
-  
-  players.push(me, mirror);
-  
-  // Spezielle Ball-Logik für Spiegelmodus
-  for (let i = 0; i < startBallCount; i++) {
-    createMirrorBall();
-  }
+  mode = "mirror"; players = []; mirrorBot = null;
+  const me = createPlayer(W() * 0.3, H() / 2, "#00ff88", "YOU");
+  mirrorBot = createPlayer(W() * 0.7, H() / 2, "#ff88aa", "Mirror");
+  const s = 0.5 + Math.random() * 0.4;
+  mirrorBot.skill      = { aim:s, reaction:s, movement:s, awareness:s, aggression:s };
+  mirrorBot.speed      = 1.0 + s * 1.2;
+  mirrorBot.awareness  = 70  + s * 90;
+  mirrorBot.dodgePower = 0.4 + s * 1.6;
+  mirrorBot.randomness = (1-s) * 4;
+  players.push(me, mirrorBot);
+  for (let i = 0; i < startBallCount; i++) createBall();
   spawnLoop();
 }
-
-// In der Update-Funktion
-function updateMirrorMode() {
-  const me = players.find(p => p.name === "YOU");
-  const mirror = players.find(p => p.name === "MIRROR");
-  
-  if (me && mirror) {
-    // Spiegel speichert Bewegung mit Verzögerung
-    mirror.movementQueue.push({x: me.x, y: me.y, time: Date.now()});
-    
-    // Alte Bewegungen entfernen
-    const now = Date.now();
-    while (mirror.movementQueue.length > 0 && 
-           now - mirror.movementQueue[0].time > mirror.mirrorDelay + 100) {
-      mirror.movementQueue.shift();
-    }
-    
-    // Geeignete Position wählen
-    if (mirror.movementQueue.length > 0) {
-      const targetMove = mirror.movementQueue[0];
-      const progress = Math.min(1, (now - targetMove.time) / mirror.mirrorDelay);
-      if (progress >= 0) {
-        mirror.x += (targetMove.x - mirror.x) * 0.1;
-        mirror.y += (targetMove.y - mirror.y) * 0.1;
-      }
-    }
-  }
-}
-
 
 // ═══════════════════════════════════════════════
 //  START GAME
@@ -2005,12 +1726,7 @@ function startGame(selectedMode) {
   } else if (mode === "coin")     { startCoinMode();     return;
   } else if (mode === "survival") { startSurvivalMode(); return;
   } else if (mode === "mirror")   { startMirrorMode();   return;
-  } else if (mode === "speedrun")   { startSpeedrunMode();   return;
-} else if (mode === "team")       { startTeamMode();       return;
-} else if (mode === "zombie")     { startZombieMode();     return;
-} else if (mode === "boss")       { startBossMode();       return;
-} else if (mode === "puzzle")     { startPuzzleMode();     return;
-                                  }
+  }
 
   if (["single","ai","multi"].includes(mode)) updateRanking();
 }
@@ -2159,7 +1875,7 @@ function gameOver() {
   document.getElementById("finalTime").textContent = survived;
   const recEl = document.getElementById("record");
   if (recEl) recEl.textContent = record;
-  showEnhancedGameOver();
+  showScreen("gameOver");
 }
 
 // ═══════════════════════════════════════════════
@@ -2258,20 +1974,11 @@ if (onlineIsHost) {
   }
 
   // AI
-  // Ersetze diesen Teil:
-
-
-// Durch diesen:
-for (const p of players) {
-  if (!p.alive) continue;
-  const humanNames = ["Player","Player 1","Player 2","YOU"];
-  if (!humanNames.includes(p.name)) updateAIAdvanced(p, balls);
-}
-
-// Füge hinzu nach der KI-Schleife:
-if (mode === "coin") updateCoinMode();
-if (mode === "mirror") updateAIMirror(players.find(p => p.name === "MIRROR"));
-
+  for (const p of players) {
+    if (!p.alive) continue;
+    const humanNames = ["Player","Player 1","Player 2","YOU"];
+    if (!humanNames.includes(p.name)) updateAI(p, balls);
+  }
 
   // Clamp
   for (const p of players) {
@@ -2308,34 +2015,6 @@ if (mode === "mirror") updateAIMirror(players.find(p => p.name === "MIRROR"));
   }
 
   for (const p of players) checkCollision(p);
-}
-// In der Update-Funktion für Coin-Modus
-function updateCoinMode() {
-  for (const p of players) {
-    if (!p.alive || p.name === "Player") continue;
-    
-    // Bots suchen aktiv nach Coins
-    let nearestCoin = null;
-    let minDist = Infinity;
-    
-    for (const c of coins) {
-      const dx = p.x - c.x, dy = p.y - c.y;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      if (dist < minDist && dist < p.awareness) {
-        minDist = dist;
-        nearestCoin = c;
-      }
-    }
-    
-    if (nearestCoin) {
-      // Bot bewegt sich zur Münze
-      const dx = nearestCoin.x - p.x;
-      const dy = nearestCoin.y - p.y;
-      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-      p.targetX = nearestCoin.x;
-      p.targetY = nearestCoin.y;
-    }
-  }
 }
 
 // ── Online collision: only check local player, report result ──
@@ -2513,7 +2192,10 @@ function finishMatch(match, winner, loser) {
   if (winner.name === "YOU") showEloAnimation(change);
   if (loser.name  === "YOU") showEloAnimation(-change);
 
+  // Nur Banner zeigen wenn du im Spectator-Modus bist
+if (spectateModeActive) {
   matchBanner = { text: "🏆 Winner: " + winner.name, ts: Date.now(), duration: 2500 };
+}
 
   setTimeout(() => {
     if (humanRemovedFromQueue) {
@@ -2575,51 +2257,6 @@ function finishArena() {
   } else {
     document.getElementById("finalTime").innerHTML += "<br><br><b>TOURNAMENT OVER</b>";
   }
-}
-function calculateRankings() {
-  const rankings = [];
-  
-  for (const player of players) {
-    let score = 0;
-    
-    switch(mode) {
-      case "coin":
-        score = (player.coinsCollected || 0) * 100 + Math.floor((Date.now() - startTime) / 1000);
-        break;
-      case "survival":
-        score = survivalWave * 500 + Math.floor((Date.now() - startTime) / 1000);
-        break;
-      case "speedrun":
-        score = 10000 - Math.floor((Date.now() - startTime) / 10);
-        break;
-      default:
-        score = Math.floor((Date.now() - startTime) / 1000);
-    }
-    
-    rankings.push({
-      name: player.name,
-      score: score,
-      details: getModeSpecificDetails(player)
-    });
-  }
-  
-  rankings.sort((a, b) => b.score - a.score);
-  return rankings;
-}
-
-function showEnhancedGameOver() {
-  const rankings = calculateRankings();
-  let html = `<h2>🏆 ${getModeName(mode)} Results</h2>`;
-  
-  rankings.forEach((rank, index) => {
-    html += `<div style="margin:10px; padding:10px; background:rgba(255,255,255,0.1); border-radius:8px;">
-      <b>#${index + 1}</b> ${rank.name} - ${rank.score} points
-      <br><small>${rank.details}</small>
-    </div>`;
-  });
-  
-  document.getElementById("gameOver").innerHTML = html;
-  showScreen("gameOver");
 }
 
 // ═══════════════════════════════════════════════
