@@ -1646,11 +1646,19 @@ function startCoinMode() {
   for (let i = 0; i < startBallCount; i++) createBall();
   spawnLoop();
   
-  coinIntervalId = setInterval(() => {
+  
+     coinIntervalId = setInterval(() => {
     if (!running) { clearInterval(coinIntervalId); coinIntervalId = null; return; }
     coinTimeLeft--;
     document.getElementById("coinTime").textContent = coinTimeLeft;
+    
     if (coinTimeLeft <= 0) {
+      clearInterval(coinIntervalId); coinIntervalId = null;
+      endCoinMode();
+    }
+    // Das "else if (Math.random() < 0.4) spawnCoin();" wurde hier gelöscht!
+  }, 1000);
+
       clearInterval(coinIntervalId); coinIntervalId = null;
       endCoinMode(); // NEU: Sauberes Beenden bei Zeitablauf
     } else if (Math.random() < 0.4) spawnCoin();
@@ -2064,8 +2072,8 @@ if (onlineIsHost) {
           }
           
           // Münze entfernen und eventuell eine neue spawnen
-          coins.splice(i, 1);
-          if (Math.random() < 0.4) spawnCoin();
+        coins.splice(i, 1);
+          spawnCoin(); 
         }
       }
     }
