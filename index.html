@@ -2179,7 +2179,7 @@ function finishMatch(match, winner, loser) {
   match.running = false;
   const diff   = loser.elo - winner.elo;
   const change = Math.max(1, Math.min(15, 5 + diff / 100));
-  winner.elo += change; loser.elo -= change;
+  
   if (winner.stats) {
   if (loser.elo > (winner.stats.bestWin || 0)) {
     winner.stats.bestWin = loser.elo;
@@ -2196,6 +2196,7 @@ if (loser.stats) {
     loser.stats.worstLossOpp = winner.name;
   }
 }
+  winner.elo += change; loser.elo -= change;
   winner.lastChange = change; loser.lastChange = -change;
   winner.alive = true; loser.alive = true;
   winner.arenaScore = (winner.arenaScore || 0) + 1;
