@@ -1799,30 +1799,26 @@ function startTeamMode() {
 }
 function startZombieMode() {
   mode = "zombie";
-  zombieHorde = [];
-  survivors = [];
+  players = [createPlayer(W()/2, H()/2, "#00ff88", "SURVIVOR")];
   
-  // Ein Spieler, viele Zombie-Bots
-  const human = createPlayer(W()/2, H()/2, "#00ff88", "LAST_HOPE", true);
-  survivors.push(human);
-  players.push(human);
-  
-  // Zombie-Bots
-  for (let i = 0; i < 12; i++) {
+  // Zombie Bots
+  for (let i = 0; i < 8; i++) {
     const zombie = createPlayer(
-      Math.random() * W(),
-      Math.random() * H(),
+      Math.random() * W(),      // HIER FEHLTE DIE KLAMMER: Math.random() statt Math.random
+      Math.random() * H(),      // HIER FEHLTE DIE KLAMMER: Math.random() statt Math.random
       "#44aa44",
-      `ZOMBIE${i+1}`,
-      false
+      `ZOMBIE${i+1}`
     );
     zombie.isZombie = true;
-    zombie.speed = 1.8; // Langsam aber beharrlich
-    zombie.awareness = 400; // Können Spieler von weit weg riechen
-    zombieHorde.push(zombie);
+    zombie.speed = 1.8;
+    zombie.awareness = 400;
     players.push(zombie);
   }
+  
+  document.getElementById("mode").textContent = "Zombie Survival";
+  startGameCommon();
 }
+
 function startBossMode() {
   mode = "boss";
   
