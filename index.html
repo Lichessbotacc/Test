@@ -2369,19 +2369,9 @@ function openProfile(name) {
     <div class="prof-row"><span class="prof-label">ELO Gained</span><span class="prof-val" style="color:lime">+${Math.round(p.stats.totalEloGain)}</span></div>
     <div class="prof-row"><span class="prof-label">ELO Lost</span><span class="prof-val" style="color:#ff4444">-${Math.round(p.stats.totalEloLoss)}</span></div>
     <div class="prof-row"><span class="prof-label">Status</span><span class="prof-val">${inMatch?"⚔️ vs "+opp?.name:"⏳ Waiting"}</span></div>
-    <div class="prof-row">
-  <span class="prof-label">Best Win</span>
-  <span class="prof-val" style="color:#00ff88">
-    ${p.stats.bestWin || 0} ELO vs ${p.stats.bestWinOpp || "-"}
-  </span>
-</div>
+    <div class="prof-row"><span class="prof-label">Best Win</span><span class="prof-val" style="color:#00ff88">${Math.round(p.bestWinChange ?? 0)} ELO vs ${p.bestWinOpp || "-"}</span></div>
 
-<div class="prof-row">
-  <span class="prof-label">Worst Loss</span>
-  <span class="prof-val" style="color:#ff4444">
-    ${p.stats.worstLoss || 0} ELO vs ${p.stats.worstLossOpp || "-"}
-  </span>
-</div>
+<div class="prof-row"><span class="prof-label">Worst Loss</span><span class="prof-val" style="color:#ff4444">${Math.round(p.worstLossChange ?? 0)} ELO vs ${p.worstLossOpp || "-"}</span></div>
     <div class="prof-row"><span class="prof-label">Speed</span><span class="prof-val">${p.speed.toFixed(1)}</span></div>
     <div class="prof-row"><span class="prof-label">Awareness</span><span class="prof-val">${Math.round(p.awareness)}px</span></div>
   `;
