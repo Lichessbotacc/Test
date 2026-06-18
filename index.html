@@ -1502,12 +1502,19 @@ function updateAI(p, activeBalls) {
   let moveY = (p.targetY || H()/2) - p.y;
   const moveDist = Math.sqrt(moveX*moveX + moveY*moveY) || 1;
   moveX /= moveDist; moveY /= moveDist;
-  let avoidX = 0, avoidY = 0;
-  const wallMargin = 140;
-  if (p.x < wallMargin)     avoidX += (wallMargin - p.x) * 0.03;
-  if (p.x > W()-wallMargin) avoidX -= (p.x - (W()-wallMargin)) * 0.03;
-  if (p.y < wallMargin)     avoidY += (wallMargin - p.y) * 0.03;
-  if (p.y > H()-wallMargin) avoidY -= (p.y - (H()-wallMargin)) * 0.03;
+    let avoidX = 0, avoidY = 0;
+  
+  // NEU: Wenn wir im Münzen-Modus (coin) sind, setzen wir den Sicherheitsabstand 
+  // zum Rand auf 0. Dadurch können die Bots problemlos bis in die Ecken laufen.
+  const wallMargin = (mode === "coin") ? 0 : 140;
+  
+  if (wallMargin > 0) {
+    if (p.x < wallMargin)     avoidX += (wallMargin - p.x) * 0.03;
+    if (p.x > W()-wallMargin) avoidX -= (p.x - (W()-wallMargin)) * 0.03;
+    if (p.y < wallMargin)     avoidY += (wallMargin - p.y) * 0.03;
+    if (p.y > H()-wallMargin) avoidY -= (p.y - (H()-wallMargin)) * 0.03;
+  }
+
   for (const b of activeBalls) {
     const dx = p.x - b.x, dy = p.y - b.y;
     const dist = Math.sqrt(dx*dx + dy*dy) || 1;
