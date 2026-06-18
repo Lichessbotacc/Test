@@ -1646,8 +1646,7 @@ function startCoinMode() {
   for (let i = 0; i < startBallCount; i++) createBall();
   spawnLoop();
   
-  
-     coinIntervalId = setInterval(() => {
+  coinIntervalId = setInterval(() => {
     if (!running) { clearInterval(coinIntervalId); coinIntervalId = null; return; }
     coinTimeLeft--;
     document.getElementById("coinTime").textContent = coinTimeLeft;
@@ -1656,14 +1655,9 @@ function startCoinMode() {
       clearInterval(coinIntervalId); coinIntervalId = null;
       endCoinMode();
     }
-    // Das "else if (Math.random() < 0.4) spawnCoin();" wurde hier gelöscht!
-  }, 1000);
-
-      clearInterval(coinIntervalId); coinIntervalId = null;
-      endCoinMode(); // NEU: Sauberes Beenden bei Zeitablauf
-    } else if (Math.random() < 0.4) spawnCoin();
   }, 1000);
 }
+
 
 
 // ═══════════════════════════════════════════════
