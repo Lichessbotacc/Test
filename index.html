@@ -2577,7 +2577,9 @@ function draw() {
         const opp = myMatch.players.find(p => p.name !== "YOU");
         if (opp) {
           const sorted  = [...participants].sort((a,b) => b.elo - a.elo);
-          const oppRank = sorted.findIndex(p => p.name === opp.          name}</b><br>Rank: <b>#${oppRank}</b> of ${participants.length}<br>ELO: <b>${Math.round(opp.elo)}</b><br>Skill: <b>${Math.round(getSkillValue(opp)*100)}%</b>`;
+         const oppRank = sorted.findIndex(p => p.name === opp.name) + 1;
+oppDiv.innerHTML = `<b>Opponent: ${opp.name}</b><br>Rank: <b>#${oppRank}</b> of ${participants.length}<br>ELO: <b>${Math.round(opp.elo)}</b><br>Skill: <b>${Math.round(getSkillValue(opp)*100)}%</b>`;
+
         }
       } else { oppDiv.style.display = "none"; }
       specDiv.style.display = "none";
@@ -2654,7 +2656,7 @@ function draw() {
     if (me && !me.alive) {
       ctx.fillStyle = "rgba(255,0,0,0.18)";
       ctx.fillRect(0, 0, W(), H());
-      ctx.fillStyle = "white              "white"; ctx.font = "bold 48px Arial"; ctx.textAlign = "center";
+     ctx.fillStyle = "white"              ; ctx.font = "bold 48px Arial"; ctx.textAlign = "center";
               ctx.fillText("💀 You died! Waiting for result…", W()/2, H()/2);
             }
           }
