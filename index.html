@@ -1535,7 +1535,20 @@ function createPlayer(x, y, color, name) {
     lastVX: 0, lastVY: 0,
     aiVX: 0, aiVY: 0,
     arenaScore: 0, deathTime: 0,
-    stats: { wins:0, losses:0, totalEloGain:0, totalEloLoss:0, matchesPlayed:0, bestStreak:0, currentStreak:0 }
+    stats: {
+  wins:0,
+  losses:0,
+  totalEloGain:0,
+  totalEloLoss:0,
+  matchesPlayed:0,
+  bestStreak:0,
+  currentStreak:0,
+
+  bestWin:0,
+  bestWinOpp:"",
+  worstLoss:0,
+  worstLossOpp:""
+
   };
 }
 
@@ -2167,6 +2180,22 @@ function finishMatch(match, winner, loser) {
   const diff   = loser.elo - winner.elo;
   const change = Math.max(1, Math.min(15, 5 + diff / 100));
   winner.elo += change; loser.elo -= change;
+  if (winner.stats) {
+  if (loser.elo > (winner.stats.bestWin || 0)) {
+    winner.stats.bestWin = loser.elo;
+    winner.stats.bestWinOpp = loser.name;
+  }
+}
+
+if (loser.stats) {
+  if (
+    loser.stats.worstLoss === 0 ||
+    winner.elo < loser.stats.worstLoss
+  ) {
+    loser.stats.worstLoss = winner.elo;
+    loser.stats.worstLossOpp = winner.name;
+  }
+}
   winner.lastChange = change; loser.lastChange = -change;
   winner.alive = true; loser.alive = true;
   winner.arenaScore = (winner.arenaScore || 0) + 1;
@@ -2193,8 +2222,12 @@ function finishMatch(match, winner, loser) {
   if (loser.name  === "YOU") showEloAnimation(-change);
 
   // Nur Banner zeigen wenn du im Spectator-Modus bist
-if (spectateModeActive) {
-  matchBanner = { text: "🏆 Winner: " + winner.name, ts: Date.now(), duration: 2500 };
+if (spectateModeActive && spectateMatchId === match.id) {
+  matchBanner = {
+    text: "🏆 Winner: " + winner.name,
+    ts: Date.now(),
+    duration: 2500
+  };
 }
 
   setTimeout(() => {
@@ -2336,6 +2369,19 @@ function openProfile(name) {
     <div class="prof-row"><span class="prof-label">ELO Gained</span><span class="prof-val" style="color:lime">+${Math.round(p.stats.totalEloGain)}</span></div>
     <div class="prof-row"><span class="prof-label">ELO Lost</span><span class="prof-val" style="color:#ff4444">-${Math.round(p.stats.totalEloLoss)}</span></div>
     <div class="prof-row"><span class="prof-label">Status</span><span class="prof-val">${inMatch?"⚔️ vs "+opp?.name:"⏳ Waiting"}</span></div>
+    <div class="prof-row">
+  <span class="prof-label">Best Win</span>
+  <span class="prof-val" style="color:#00ff88">
+    ${p.stats.bestWin || 0} ELO vs ${p.stats.bestWinOpp || "-"}
+  </span>
+</div>
+
+<div class="prof-row">
+  <span class="prof-label">Worst Loss</span>
+  <span class="prof-val" style="color:#ff4444">
+    ${p.stats.worstLoss || 0} ELO vs ${p.stats.worstLossOpp || "-"}
+  </span>
+</div>
     <div class="prof-row"><span class="prof-label">Speed</span><span class="prof-val">${p.speed.toFixed(1)}</span></div>
     <div class="prof-row"><span class="prof-label">Awareness</span><span class="prof-val">${Math.round(p.awareness)}px</span></div>
   `;
