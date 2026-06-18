@@ -1466,7 +1466,13 @@ function getSkillValue(p) {
 
 function updateAI(p, activeBalls) {
   if (!p.alive) return;
+  
+  // NUR IM COIN-MODUS: Wenn der Bot eingefroren ist, Bewegung sperren
+  if (mode === "coin" && p.stunnedUntil && Date.now() < p.stunnedUntil) return;
+
   let danger = false;
+  // ... (Ab hier geht dein bisheriger Code in updateAI unverändert weiter!)
+
   for (const b of activeBalls) {
     const dx = p.x - b.x, dy = p.y - b.y;
     if (Math.sqrt(dx*dx + dy*dy) < p.awareness) { danger = true; break; }
@@ -2171,21 +2177,38 @@ function updateMatch(match) {
 
 function checkCollision(p) {
   if (!p.alive) return;
-  for (const b of balls) {
-    const dx = p.x - b.x, dy = p.y - b.y;
-    if (Math.sqrt(dx*dx + dy*dy) < p.radius + b.radius) {
-      p.alive = false;
-      p.deathTime = Date.now();
-      eliminated.push(p);
-      const alive = players.filter(x => x.alive);
-      if (alive.length <= 1) {
-        if (alive.length === 1 && !eliminated.includes(alive[0])) {
-          alive[0].deathTime = Infinity;
-          eliminated.push(alive[0]);
-        }
-        finishArena();
+
+  // NUR IM COIN-MODUS: Unverwundbarkeit prüfen
+  if (mode === "coin" && p.invulnerableUntil && Date.now() < p.invulnerableUntil) return;
+
+  if (mode === "coin") {
+    // Münzen-Modus: Einfrieren statt Ausscheiden
+    for (const b of balls) {
+      const dx = p.x - b.x, dy = p.y - b.y;
+      if (Math.sqrt(dx*dx + dy*dy) < p.radius + b.radius) {
+        p.stunnedUntil = Date.now() + 5000;
+        p.invulnerableUntil = Date.now() + 6000; // 5s Freeze + 1s Fluchtzeit
+        return;
       }
-      return;
+    }
+  } else {
+    // Alle anderen Modi: Normales Ausscheiden bei Treffer
+    for (const b of balls) {
+      const dx = p.x - b.x, dy = p.y - b.y;
+      if (Math.sqrt(dx*dx + dy*dy) < p.radius + b.radius) {
+        p.alive = false;
+        p.deathTime = Date.now();
+        eliminated.push(p);
+        const alive = players.filter(x => x.alive);
+        if (alive.length <= 1) {
+          if (alive.length === 1 && !eliminated.includes(alive[0])) {
+            alive[0].deathTime = Infinity;
+            eliminated.push(alive[0]);
+          }
+          finishArena();
+        }
+        return;
+      }
     }
   }
 }
@@ -2554,10 +2577,7 @@ function draw() {
         const opp = myMatch.players.find(p => p.name !== "YOU");
         if (opp) {
           const sorted  = [...participants].sort((a,b) => b.elo - a.elo);
-          const oppRank = sorted.findIndex(p => p.name === opp.name) + 1;
-          oppDiv.style.display = "block";
-          document.getElementById("opponentText").innerHTML =
-            `Opponent: <b style="color:#ffd700">${opp.name}</b><br>Rank: <b>#${oppRank}</b> of ${participants.length}<br>ELO: <b>${Math.round(opp.elo)}</b><br>Skill: <b>${Math.round(getSkillValue(opp)*100)}%</b>`;
+          const oppRank = sorted.findIndex(p => p.name === opp.          name}</b><br>Rank: <b>#${oppRank}</b> of ${participants.length}<br>ELO: <b>${Math.round(opp.elo)}</b><br>Skill: <b>${Math.round(getSkillValue(opp)*100)}%</b>`;
         }
       } else { oppDiv.style.display = "none"; }
       specDiv.style.display = "none";
@@ -2598,8 +2618,25 @@ function draw() {
   // ── PLAYERS ──
   for (const p of players) {
     if (!p.alive) continue;
+
+    // NUR IM COIN-MODUS: Blinken (Flashen) während der Unverwundbarkeit
+    if (mode === "coin" && p.invulnerableUntil && Date.now() < p.invulnerableUntil) {
+      if (Math.floor(Date.now() / 100) % 2 === 0) {
+        continue; // Überspringt das Zeichnen dieses Frames (Blink-Effekt)
+      }
+    }
+
     ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
     ctx.fillStyle = p.color; ctx.fill();
+
+    // NUR IM COIN-MODUS: Eisblauer Ring um eingefrorene (stunned) Spieler/Bots zeichnen
+    if (mode === "coin" && p.stunnedUntil && Date.now() < p.stunnedUntil) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius + 6, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(0, 191, 255, 0.8)"; // Eisblau
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    }
 
     if (mode === "mirror" && p.name === "Mirror") {
       ctx.beginPath(); ctx.arc(p.x, p.y, p.radius+4, 0, Math.PI*2);
@@ -2617,11 +2654,15 @@ function draw() {
     if (me && !me.alive) {
       ctx.fillStyle = "rgba(255,0,0,0.18)";
       ctx.fillRect(0, 0, W(), H());
-      ctx.fillStyle = "white"; ctx.font = "bold 48px Arial"; ctx.textAlign = "center";
-      ctx.fillText("💀 You died! Waiting for result…", W()/2, H()/2);
-    }
-  }
-}
+      ctx.fillStyle = "white              "white"; ctx.font = "bold 48px Arial"; ctx.textAlign = "center";
+              ctx.fillText("💀 You died! Waiting for result…", W()/2, H()/2);
+            }
+          }
+        }
+
+
+
+
 
 // ═══════════════════════════════════════════════
 //  CONTROLS — coordinates always mapped through the fixed virtual canvas
@@ -2629,22 +2670,26 @@ function draw() {
 function moveSingle(x, y) {
   if (spectateModeActive || humanRemovedFromQueue) return;
 
+  // NUR IM COIN-MODUS: Bewegung sperren, wenn eingefroren
+  const me = players.find(p => p.name === "Player" || p.name === "YOU" || p.name === "Player 1");
+  if (mode === "coin" && me && me.stunnedUntil && Date.now() < me.stunnedUntil) return;
+
   if (mode === "tournament") {
     const match = playerMatchMap.get("YOU");
     if (!match || !match.running) return;
-    const me = match.players.find(p => p.name === "YOU");
-    if (me && me.alive) {
-      me.x = Math.max(me.radius, Math.min(W()-me.radius, x));
-      me.y = Math.max(me.radius, Math.min(H()-me.radius, y));
+    const meMatch = match.players.find(p => p.name === "YOU");
+    if (meMatch && meMatch.alive) {
+      meMatch.x = Math.max(meMatch.radius, Math.min(W()-meMatch.radius, x));
+      meMatch.y = Math.max(meMatch.radius, Math.min(H()-meMatch.radius, y));
     }
     return;
   }
 
   if (mode === "online") {
-    const me = players.find(p => p.name === onlineAccount?.name);
-    if (me && me.alive) {
-      me.x = Math.max(me.radius, Math.min(W()-me.radius, x));
-      me.y = Math.max(me.radius, Math.min(H()-me.radius, y));
+    const meOnline = players.find(p => p.name === onlineAccount?.name);
+    if (meOnline && meOnline.alive) {
+      meOnline.x = Math.max(meOnline.radius, Math.min(W()-meOnline.radius, x));
+      meOnline.y = Math.max(meOnline.radius, Math.min(H()-meOnline.radius, y));
     }
     return;
   }
@@ -2654,6 +2699,7 @@ function moveSingle(x, y) {
     players[0].y = Math.max(players[0].radius, Math.min(H()-players[0].radius, y));
   }
 }
+
   function endCoinMode() {
   running = false;
   clearAllTimers();
