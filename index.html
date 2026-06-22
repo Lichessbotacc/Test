@@ -90,6 +90,10 @@ input[type=text],input[type=number]{padding:12px 18px;font-size:18px;border-radi
 #pingDisplay{position:absolute;top:20px;right:210px;color:#aaa;font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;display:none;z-index:20;pointer-events:none;}
 #onlineHUD{position:absolute;top:20px;left:50%;transform:translateX(-50%);display:none;flex-direction:column;align-items:center;background:rgba(0,0,0,0.7);padding:8px 20px;border-radius:12px;color:white;font-size:16px;z-index:20;pointer-events:none;border:1px solid rgba(255,255,255,0.15);}
 .online-names{display:flex;gap:20px;font-size:20px;font-weight:bold;}
+#matchBanner{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);padding:30px 50px;border-radius:16px;color:white;z-index:35;text-align:center;border:2px solid rgba(255,215,0,0.3);}
+#matchBanner .winner-name{font-size:36px;font-weight:bold;color:#ffd700;}
+#matchBanner .loser-name{font-size:24px;color:#ff4444;}
+#matchBanner .elo-change{font-size:18px;color:#aaa;margin-top:10px;}
 </style>
 </head>
 <body>
@@ -124,7 +128,7 @@ input[type=text],input[type=number]{padding:12px 18px;font-size:18px;border-radi
 
       <div style="display: flex; flex-direction: column; align-items: center; flex-shrink: 0;">
         <h1>DarkOnBalls</h1>
-        <button onclick="showScreen('onlineFlow')">🌐 Online 1v1</button>
+        <button onclick="showOnlineFlow()">🌐 Online 1v1</button>
         <button onclick="startOnlineTV()">📺 Best Online TV</button>
         <button onclick="startGame('single')">Singleplayer</button>
         <button onclick="startGame('multi')">Multiplayer (local)</button>
@@ -213,6 +217,12 @@ input[type=text],input[type=number]{padding:12px 18px;font-size:18px;border-radi
       <button onclick="restartGame()">Play Again</button>
       <button onclick="backToMenu()">🏠 Menu</button>
       <div id="ranking" style="position:absolute;top:20px;right:20px;color:white;font-size:18px;text-align:left;max-height:90vh;overflow:auto;"></div>
+    </div>
+
+    <div id="matchBanner">
+      <div class="winner-name" id="matchWinnerName">🏆 Winner</div>
+      <div class="loser-name" id="matchLoserName">defeated Loser</div>
+      <div class="elo-change" id="matchEloChange">ELO +0</div>
     </div>
 
     <div id="eloResult"></div>
@@ -529,18 +539,27 @@ function resetRecord() {
 function backToMenu() {
   clearAllTimers();
   if (onlineSearchInterval) { clearInterval(onlineSearchInterval); onlineSearchInterval = null; }
+  if (onlineBotMatchTimeout) { clearTimeout(onlineBotMatchTimeout); onlineBotMatchTimeout = null; }
+  if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
   running = false;
   balls = [];
   players = [];
+  coins = [];
   document.getElementById("gameOver").style.display = "none";
+  document.getElementById("winnerOverlay").style.display = "none";
+  document.getElementById("matchBanner").style.display = "none";
   document.getElementById("menu").style.display = "flex";
+  document.getElementById("ui").style.display = "none";
   document.getElementById("eloTable").style.display = "none";
   document.getElementById("spectatorInfo").style.display = "none";
   document.getElementById("coinHUD").style.display = "none";
   document.getElementById("onlineHUD").style.display = "none";
+  document.getElementById("pingDisplay").style.display = "none";
+  document.getElementById("homeBtn").style.display = "none";
   if (fbReady && onlineAccount) {
     updatePlayerStatus("Idle in Menu");
   }
+  cleanupOnline();
 }
 
 // ═══════════════════════════════════════════════
@@ -548,7 +567,7 @@ function backToMenu() {
 // ═══════════════════════════════════════════════
 let balls = [], players = [], ranking = [], eliminated = [];
 let running = false, startTime = 0;
-let spawnTimeoutId = null, survivalIntervalId = null, coinIntervalId = null;
+let spawnTimeoutId = null, survivalIntervalId = null, coinIntervalId = null, gameLoopId = null;
 let mode = "single";
 let tournamentRounds = 100, currentRound = 1;
 let participants = [], matches = [], waitingQueue = [];
@@ -593,18 +612,1020 @@ let matchBanner = null;
 //  HOME / EXIT
 // ═══════════════════════════════════════════════
 function confirmHome() {
-  if (confirm("Return to main menu?")) exitToMenu();
-}
-
-function exitToMenu() {
-  cleanupOnline();
-  setTimeout(() => {
-    window.location.reload();
-  }, 150);
+  if (confirm("Return to main menu?")) backToMenu();
 }
 
 function clearAllTimers() {
   if (spawnTimeoutId)     { clearTimeout(spawnTimeoutId);      spawnTimeoutId     = null; }
   if (survivalIntervalId) { clearInterval(survivalIntervalId); survivalIntervalId = null; }
   if (coinIntervalId)     { clearInterval(coinIntervalId);     coinIntervalId     = null; }
-  if (onlineBotMatchTimeout) { clear
+  if (onlineBotMatchTimeout) { clearTimeout(onlineBotMatchTimeout); onlineBotMatchTimeout = null; }
+}
+
+// ═══════════════════════════════════════════════
+//  SCREEN MANAGEMENT
+// ═══════════════════════════════════════════════
+function showScreen(id) {
+  const screens = ["menu","settings","accountScreen","leaderboardScreen","onlineWait","vsScreen","winnerOverlay","gameOver"];
+  screens.forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.style.display = (s === id) ? "flex" : "none";
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  LEADERBOARD
+// ═══════════════════════════════════════════════
+async function loadLeaderboard() {
+  if (!fbReady) { alert("Firebase not ready"); return; }
+  const playersData = await dbGet("players");
+  if (!playersData) return;
+  const list = Object.values(playersData).filter(p => p.name);
+  list.sort((a,b) => (b.elo || 1500) - (a.elo || 1500));
+  const table = document.getElementById("lbTable");
+  let html = `<div class="lb-row"><span>Rank</span><span>Name</span><span>ELO</span><span>W/L</span></div>`;
+  list.forEach((p, i) => {
+    const isMe = onlineAccount && p.name === onlineAccount.name;
+    html += `<div class="lb-row ${isMe ? 'lb-me' : ''}">
+      <span>#${i+1}</span>
+      <span>${p.name}</span>
+      <span>${p.elo || 1500}</span>
+      <span>${p.wins || 0}/${p.losses || 0}</span>
+    </div>`;
+  });
+  table.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════
+//  GAME START FUNCTIONS
+// ═══════════════════════════════════════════════
+function startGame(modeType) {
+  mode = modeType;
+  document.getElementById("menu").style.display = "none";
+  document.getElementById("ui").style.display = "block";
+  document.getElementById("mode").textContent = modeType;
+  document.getElementById("homeBtn").style.display = "block";
+  document.getElementById("onlineHUD").style.display = "none";
+  document.getElementById("spectatorInfo").style.display = "none";
+  document.getElementById("coinHUD").style.display = "none";
+  document.getElementById("ranking").innerHTML = "";
+  document.getElementById("matchBanner").style.display = "none";
+  
+  running = true;
+  startTime = Date.now();
+  balls = [];
+  players = [];
+  coins = [];
+  
+  if (modeType === "single") {
+    startSingleplayer();
+  } else if (modeType === "multi") {
+    startMultiplayer();
+  } else if (modeType === "ai") {
+    startAISpectate();
+  } else if (modeType === "tournament") {
+    startTournament();
+  } else if (modeType === "coin") {
+    startCoinHunt();
+  }
+  
+  if (!gameLoopId) gameLoop();
+}
+
+// ─── SINGLEPLAYER ───
+function startSingleplayer() {
+  players.push({
+    x: W()/2,
+    y: H()/2,
+    r: playerRadiusSetting,
+    color: "#00ff88",
+    name: "You",
+    alive: true,
+    isHuman: true,
+    speed: 5
+  });
+  
+  for (let i = 0; i < startBallCount; i++) {
+    spawnBall();
+  }
+  
+  survivalWave = 1;
+  if (survivalIntervalId) clearInterval(survivalIntervalId);
+  survivalIntervalId = setInterval(() => {
+    if (!running) return;
+    const elapsed = (Date.now() - startTime) / 1000;
+    document.getElementById("time").textContent = Math.floor(elapsed);
+    
+    if (elapsed > record) {
+      record = Math.floor(elapsed);
+      localStorage.setItem("fingerDodgeRecord", String(record));
+      document.getElementById("record").textContent = record;
+    }
+    
+    if (balls.length < 30 + Math.floor(elapsed / 5) * 2 && Math.random() < 0.1) {
+      spawnBall();
+    }
+  }, 100);
+}
+
+function spawnBall() {
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 100 + Math.random() * 300;
+  const x = W()/2 + Math.cos(angle) * dist;
+  const y = H()/2 + Math.sin(angle) * dist;
+  const speed = 0.8 + Math.random() * 2 * ballSpeedMultiplier;
+  const dir = Math.atan2(H()/2 - y, W()/2 - x) + (Math.random() - 0.5) * 0.5;
+  
+  balls.push({
+    x, y,
+    vx: Math.cos(dir) * speed,
+    vy: Math.sin(dir) * speed,
+    r: 12 + Math.random() * 15,
+    color: `hsl(${Math.random() * 360}, 80%, 60%)`
+  });
+}
+
+// ─── MULTIPLAYER (LOCAL) ───
+function startMultiplayer() {
+  // Player 1 - WASD
+  players.push({
+    x: W()/2 - 100,
+    y: H()/2,
+    r: playerRadiusSetting,
+    color: "#00ff88",
+    name: "P1 (WASD)",
+    alive: true,
+    isHuman: true,
+    controls: { up: 'w', down: 's', left: 'a', right: 'd' },
+    speed: 5
+  });
+  
+  // Player 2 - Arrow keys
+  players.push({
+    x: W()/2 + 100,
+    y: H()/2,
+    r: playerRadiusSetting,
+    color: "#ff4444",
+    name: "P2 (Arrows)",
+    alive: true,
+    isHuman: true,
+    controls: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' },
+    speed: 5
+  });
+  
+  for (let i = 0; i < startBallCount * 2; i++) {
+    spawnBallMulti();
+  }
+  
+  if (survivalIntervalId) clearInterval(survivalIntervalId);
+  survivalIntervalId = setInterval(() => {
+    if (!running) return;
+    document.getElementById("time").textContent = Math.floor((Date.now() - startTime) / 1000);
+    if (balls.length < 20) {
+      spawnBallMulti();
+    }
+  }, 100);
+}
+
+function spawnBallMulti() {
+  const x = 30 + Math.random() * (W() - 60);
+  const y = 30 + Math.random() * (H() - 60);
+  const speed = 0.6 + Math.random() * 1.5 * ballSpeedMultiplier;
+  const angle = Math.random() * Math.PI * 2;
+  
+  balls.push({
+    x, y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    r: 10 + Math.random() * 12,
+    color: `hsl(${Math.random() * 360}, 80%, 60%)`
+  });
+}
+
+// ─── AI SPECTATE ───
+function startAISpectate() {
+  document.getElementById("spectatorInfo").style.display = "block";
+  document.getElementById("spectatorText").textContent = "Watching AI battle...";
+  
+  for (let i = 0; i < aiBotCount; i++) {
+    players.push({
+      x: 50 + Math.random() * (W() - 100),
+      y: 50 + Math.random() * (H() - 100),
+      r: 10 + Math.random() * 8,
+      color: `hsl(${(i / aiBotCount) * 360}, 80%, 60%)`,
+      name: "AI-" + (i + 1),
+      alive: true,
+      isHuman: false,
+      isBot: true,
+      speed: 2 + Math.random() * 3,
+      targetX: 50 + Math.random() * (W() - 100),
+      targetY: 50 + Math.random() * (H() - 100)
+    });
+  }
+  
+  for (let i = 0; i < startBallCount * 2; i++) {
+    spawnBallAI();
+  }
+  
+  if (survivalIntervalId) clearInterval(survivalIntervalId);
+  survivalIntervalId = setInterval(() => {
+    if (!running) return;
+    document.getElementById("time").textContent = Math.floor((Date.now() - startTime) / 1000);
+    if (balls.length < 15 + aiBotCount) {
+      spawnBallAI();
+    }
+    const alive = players.filter(p => p.alive);
+    document.getElementById("spectatorText").textContent = 
+      `${alive.length} of ${players.length} AI alive | ${balls.length} balls`;
+  }, 100);
+}
+
+function spawnBallAI() {
+  const x = 20 + Math.random() * (W() - 40);
+  const y = 20 + Math.random() * (H() - 40);
+  const speed = 0.4 + Math.random() * 1.5 * ballSpeedMultiplier;
+  const angle = Math.random() * Math.PI * 2;
+  
+  balls.push({
+    x, y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    r: 8 + Math.random() * 10,
+    color: `hsl(${Math.random() * 360}, 80%, 60%)`
+  });
+}
+
+// ─── TOURNAMENT (OFFLINE) ───
+let tournamentParticipants = [];
+let tournamentMatches = [];
+let tournamentRound = 1;
+let tournamentEloChange = 0;
+
+function startTournament() {
+  const names = ["You", "Warrior", "Ninja", "Samurai", "Knight", "Assassin", "Ranger", "Mage", "Berserker", "Archer"];
+  tournamentParticipants = [];
+  
+  for (let i = 0; i < 10; i++) {
+    tournamentParticipants.push({
+      name: names[i % names.length] + (i >= names.length ? Math.floor(i / names.length) + 1 : ""),
+      elo: 1500 + Math.floor(Math.random() * 200) - 100,
+      alive: true,
+      color: `hsl(${i * 36}, 80%, 60%)`,
+      isHuman: i === 0
+    });
+  }
+  
+  tournamentRound = 1;
+  document.getElementById("mode").textContent = "Tournament Round 1";
+  runTournamentRound();
+}
+
+function runTournamentRound() {
+  const alive = tournamentParticipants.filter(p => p.alive);
+  if (alive.length <= 1) {
+    const winner = alive[0];
+    document.getElementById("gameOver").style.display = "flex";
+    document.getElementById("finalTime").textContent = "🏆 " + winner.name + " Wins!";
+    document.getElementById("ranking").innerHTML = tournamentParticipants
+      .sort((a, b) => b.elo - a.elo)
+      .map((p, i) => `<div>${i+1}. ${p.name} (${p.elo})${p.isHuman ? ' ⭐' : ''}</div>`)
+      .join('');
+    running = false;
+    return;
+  }
+  
+  const shuffled = alive.sort(() => Math.random() - 0.5);
+  tournamentMatches = [];
+  for (let i = 0; i < shuffled.length - 1; i += 2) {
+    tournamentMatches.push([shuffled[i], shuffled[i + 1]]);
+  }
+  if (shuffled.length % 2 === 1) {
+    shuffled[shuffled.length - 1].elo += 5;
+  }
+  
+  document.getElementById("mode").textContent = `Tournament Round ${tournamentRound}`;
+  runNextMatch(0);
+}
+
+function runNextMatch(index) {
+  if (index >= tournamentMatches.length) {
+    tournamentRound++;
+    runTournamentRound();
+    return;
+  }
+  
+  const match = tournamentMatches[index];
+  const p1 = match[0];
+  const p2 = match[1];
+  const p1Win = p1.elo > p2.elo ? 0.6 : 0.4;
+  const winner = Math.random() < p1Win ? p1 : p2;
+  const loser = winner === p1 ? p2 : p1;
+  tournamentEloChange = 16 + Math.floor(Math.random() * 15);
+  
+  winner.elo += tournamentEloChange;
+  loser.elo = Math.max(100, loser.elo - tournamentEloChange);
+  loser.alive = false;
+  
+  // Show match banner
+  const banner = document.getElementById("matchBanner");
+  banner.style.display = "block";
+  document.getElementById("matchWinnerName").textContent = "🏆 " + winner.name;
+  document.getElementById("matchWinnerName").style.color = winner.isHuman ? "#00ff88" : "#ffd700";
+  document.getElementById("matchLoserName").textContent = "defeated " + loser.name;
+  document.getElementById("matchEloChange").textContent = `ELO +${tournamentEloChange} → ${winner.elo}`;
+  
+  setTimeout(() => {
+    banner.style.display = "none";
+    runNextMatch(index + 1);
+  }, 2000);
+}
+
+// ─── COIN HUNT ───
+function startCoinHunt() {
+  document.getElementById("coinHUD").style.display = "block";
+  coinScorePlayer = 0;
+  coinTimeLeft = 60;
+  document.getElementById("coinScore").textContent = "0";
+  document.getElementById("coinTime").textContent = "60";
+  
+  players.push({
+    x: W()/2,
+    y: H()/2,
+    r: playerRadiusSetting,
+    color: "#ffd700",
+    name: "Hunter",
+    alive: true,
+    isHuman: true,
+    speed: 6
+  });
+  
+  for (let i = 0; i < 10; i++) spawnCoin();
+  for (let i = 0; i < 5; i++) spawnBallCoin();
+  
+  if (coinIntervalId) clearInterval(coinIntervalId);
+  coinIntervalId = setInterval(() => {
+    if (!running) return;
+    coinTimeLeft--;
+    document.getElementById("coinTime").textContent = coinTimeLeft;
+    document.getElementById("time").textContent = 60 - coinTimeLeft;
+    
+    // Collect coins
+    const player = players[0];
+    for (const coin of coins) {
+      if (coin.collected) continue;
+      const dx = player.x - coin.x;
+      const dy = player.y - coin.y;
+      if (Math.sqrt(dx*dx + dy*dy) < player.r + coin.r) {
+        coin.collected = true;
+        coinScorePlayer++;
+        document.getElementById("coinScore").textContent = coinScorePlayer;
+        spawnCoin();
+      }
+    }
+    
+    if (balls.length < 10 + Math.floor((60 - coinTimeLeft) / 5)) {
+      spawnBallCoin();
+    }
+    
+    if (coinTimeLeft <= 0) {
+      running = false;
+      clearInterval(coinIntervalId);
+      document.getElementById("gameOver").style.display = "flex";
+      document.getElementById("finalTime").textContent = coinScorePlayer + " coins collected!";
+      document.getElementById("homeBtn").style.display = "none";
+      if (coinScorePlayer > record) {
+        record = coinScorePlayer;
+        localStorage.setItem("fingerDodgeRecord", String(record));
+        document.getElementById("record").textContent = record;
+      }
+    }
+  }, 1000);
+}
+
+function spawnCoin() {
+  coins.push({
+    x: 30 + Math.random() * (W() - 60),
+    y: 30 + Math.random() * (H() - 60),
+    r: 12,
+    color: "#ffd700",
+    collected: false
+  });
+}
+
+function spawnBallCoin() {
+  const x = 20 + Math.random() * (W() - 40);
+  const y = 20 + Math.random() * (H() - 40);
+  const speed = 0.5 + Math.random() * 1.5;
+  const angle = Math.random() * Math.PI * 2;
+  
+  balls.push({
+    x, y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    r: 10 + Math.random() * 10,
+    color: `hsl(${Math.random() * 360}, 80%, 60%)`
+  });
+}
+
+// ─── ONLINE 1V1 ───
+function showOnlineFlow() {
+  if (!fbReady) { alert("Firebase not ready"); return; }
+  if (!onlineAccount) {
+    const name = prompt("Enter your username for online play:", "Player" + Math.floor(Math.random() * 1000));
+    if (!name) return;
+    onlineAccount = {
+      name: name.trim(),
+      elo: 1500,
+      wins: 0,
+      losses: 0,
+      highestElo: 1500,
+      lowestElo: 1500,
+      currentStreak: 0,
+      bestStreak: 0,
+      totalEloGained: 0,
+      totalEloLost: 0,
+      bestWinChange: 0,
+      bestWinOpp: "",
+      worstLossChange: 0,
+      worstLossOpp: ""
+    };
+    saveAccountLocal();
+    pushAccountToFirebase();
+  }
+  showScreen("onlineWait");
+  updatePlayerStatus("Searching for opponent");
+  startOnlineMatchmaking();
+}
+
+function startOnlineMatchmaking() {
+  cleanupOnline();
+  onlineSearchStartTime = Date.now();
+  onlineSearchInterval = setInterval(searchForMatch, 1000);
+  
+  onlineBotMatchTimeout = setTimeout(() => {
+    if (onlineSearchInterval) {
+      clearInterval(onlineSearchInterval);
+      onlineSearchInterval = null;
+      startBotMatch();
+    }
+  }, 10000);
+}
+
+async function searchForMatch() {
+  if (!fbReady) return;
+  const matches = await dbGet("onlineMatches");
+  if (!matches) return;
+  
+  const openMatches = Object.entries(matches).filter(([id, m]) => 
+    m.status === "waiting" && m.host !== onlineAccount.name
+  );
+  
+  if (openMatches.length > 0) {
+    const [matchId, matchData] = openMatches[0];
+    await dbUpdate(`onlineMatches/${matchId}`, {
+      status: "started",
+      players: [...matchData.players, onlineAccount.name],
+      guestElo: onlineAccount.elo,
+      started: Date.now()
+    });
+    startOnlineMatch(matchId, "guest", matchData.host);
+  } else {
+    const matchId = "m_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+    await dbSet(`onlineMatches/${matchId}`, {
+      host: onlineAccount.name,
+      hostElo: onlineAccount.elo,
+      status: "waiting",
+      created: Date.now(),
+      players: [onlineAccount.name]
+    });
+    
+    const unsub = dbOn(`onlineMatches/${matchId}`, async (data) => {
+      if (!data) return;
+      if (data.status === "started" && data.players && data.players.length >= 2) {
+        cleanupOnline();
+        startOnlineMatch(matchId, "host", data.players[1]);
+      }
+    });
+    onlineUnsubscribes.push(unsub);
+    onlineMatchId = matchId;
+    onlineIsHost = true;
+    updatePlayerStatus("Hosting match (waiting)");
+  }
+}
+
+function startOnlineMatch(matchId, role, opponentName) {
+  cleanupOnline();
+  onlineMatchId = matchId;
+  onlineRole = role;
+  onlineOpponent = { name: opponentName };
+  
+  dbGet("players/" + opponentName).then(data => {
+    if (data) onlineOpponent.elo = data.elo || 1500;
+  });
+  
+  showScreen("vsScreen");
+  document.getElementById("vsName1").textContent = onlineAccount.name;
+  document.getElementById("vsElo1").textContent = "ELO " + onlineAccount.elo;
+  document.getElementById("vsName2").textContent = opponentName;
+  document.getElementById("vsElo2").textContent = "ELO " + (onlineOpponent.elo || "?");
+  
+  let countdown = 3;
+  document.getElementById("vsCountdown").textContent = "Starting in " + countdown + "…";
+  const cd = setInterval(() => {
+    countdown--;
+    if (countdown <= 0) {
+      clearInterval(cd);
+      document.getElementById("vsScreen").style.display = "none";
+      startOnlineGame(false);
+    } else {
+      document.getElementById("vsCountdown").textContent = "Starting in " + countdown + "…";
+    }
+  }, 1000);
+}
+
+function startBotMatch() {
+  onlineVsBot = true;
+  onlineOpponent = {
+    name: "Online Bot",
+    elo: 1500
+  };
+  
+  showScreen("vsScreen");
+  document.getElementById("vsName1").textContent = onlineAccount.name;
+  document.getElementById("vsElo1").textContent = "ELO " + onlineAccount.elo;
+  document.getElementById("vsName2").textContent = "Online Bot";
+  document.getElementById("vsElo2").textContent = "ELO 1500";
+  
+  let countdown = 3;
+  document.getElementById("vsCountdown").textContent = "Starting in " + countdown + "…";
+  const cd = setInterval(() => {
+    countdown--;
+    if (countdown <= 0) {
+      clearInterval(cd);
+      document.getElementById("vsScreen").style.display = "none";
+      startOnlineGame(true);
+    } else {
+      document.getElementById("vsCountdown").textContent = "Starting in " + countdown + "…";
+    }
+  }, 1000);
+}
+
+function startOnlineGame(vsBot) {
+  document.getElementById("onlineHUD").style.display = "flex";
+  document.getElementById("onlineNameMe").textContent = onlineAccount.name;
+  document.getElementById("onlineNameOpp").textContent = vsBot ? "Online Bot" : (onlineOpponent ? onlineOpponent.name : "Opponent");
+  
+  players = [
+    {
+      x: W()/2 - 100,
+      y: H()/2,
+      r: playerRadiusSetting,
+      color: "#00ff88",
+      name: onlineAccount.name,
+      alive: true,
+      isHuman: true,
+      isOnline: true,
+      speed: 5
+    },
+    {
+      x: W()/2 + 100,
+      y: H()/2,
+      r: playerRadiusSetting,
+      color: "#ff8844",
+      name: vsBot ? "Online Bot" : (onlineOpponent ? onlineOpponent.name : "Opponent"),
+      alive: true,
+      isHuman: false,
+      isOnline: true,
+      isBot: vsBot,
+      speed: 4 + Math.random()
+    }
+  ];
+  
+  balls = [];
+  for (let i = 0; i < 3; i++) spawnOnlineBall();
+  
+  running = true;
+  startTime = Date.now();
+  updatePlayerStatus("Playing Online Match");
+  if (!gameLoopId) gameLoop();
+}
+
+function spawnOnlineBall() {
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 100 + Math.random() * 300;
+  const x = W()/2 + Math.cos(angle) * dist;
+  const y = H()/2 + Math.sin(angle) * dist;
+  const speed = 0.8 + Math.random() * 2 * 0.5;
+  const dir = Math.atan2(H()/2 - y, W()/2 - x) + (Math.random() - 0.5) * 0.5;
+  
+  balls.push({
+    x, y,
+    vx: Math.cos(dir) * speed,
+    vy: Math.sin(dir) * speed,
+    r: 12 + Math.random() * 15,
+    color: `hsl(${Math.random() * 360}, 80%, 60%)`
+  });
+}
+
+function cancelOnline() {
+  cleanupOnline();
+  showScreen("menu");
+  updatePlayerStatus("Idle in Menu");
+}
+
+function cleanupOnline() {
+  if (onlineSearchInterval) { clearInterval(onlineSearchInterval); onlineSearchInterval = null; }
+  if (onlineBotMatchTimeout) { clearTimeout(onlineBotMatchTimeout); onlineBotMatchTimeout = null; }
+  for (const unsub of onlineUnsubscribes) {
+    try { unsub(); } catch(e) {}
+  }
+  onlineUnsubscribes = [];
+  if (onlineMatchId && onlineIsHost) {
+    dbRemove("onlineMatches/" + onlineMatchId);
+  }
+  onlineMatchId = null;
+  onlineRole = null;
+  onlineOpponent = null;
+  onlineResultHandled = false;
+  onlineIsHost = false;
+  onlineVsBot = false;
+}
+
+// ─── ONLINE TV ───
+function startOnlineTV() {
+  if (!fbReady) { alert("Firebase not ready"); return; }
+  document.getElementById("menu").style.display = "none";
+  document.getElementById("ui").style.display = "block";
+  document.getElementById("mode").textContent = "Online TV";
+  document.getElementById("spectatorInfo").style.display = "block";
+  document.getElementById("spectatorText").textContent = "Watching best match...";
+  document.getElementById("homeBtn").style.display = "block";
+  findBestMatchToSpectate();
+}
+
+async function findBestMatchToSpectate() {
+  const matches = await dbGet("onlineMatches");
+  if (!matches) {
+    document.getElementById("spectatorText").textContent = "No matches available. Waiting...";
+    setTimeout(findBestMatchToSpectate, 3000);
+    return;
+  }
+  
+  const activeMatches = Object.entries(matches).filter(([id, m]) => 
+    m.status === "started" && m.players && m.players.length >= 2
+  );
+  
+  if (activeMatches.length === 0) {
+    document.getElementById("spectatorText").textContent = "No active matches. Waiting...";
+    setTimeout(findBestMatchToSpectate, 3000);
+    return;
+  }
+  
+  let bestMatch = null;
+  let bestElo = 0;
+  for (const [id, m] of activeMatches) {
+    const totalElo = (m.hostElo || 1500) + (m.guestElo || 1500);
+    if (totalElo > bestElo) {
+      bestElo = totalElo;
+      bestMatch = { id, data: m };
+    }
+  }
+  
+  if (bestMatch) {
+    spectateMatchId = bestMatch.id;
+    document.getElementById("spectatorText").textContent = 
+      `Spectating: ${bestMatch.data.players[0]} (ELO ${bestMatch.data.hostElo || 1500}) vs ${bestMatch.data.players[1]} (ELO ${bestMatch.data.guestElo || 1500})`;
+    
+    if (onlineTvInnerUnsubscribe) onlineTvInnerUnsubscribe();
+    onlineTvInnerUnsubscribe = dbOn(`onlineMatches/${bestMatch.id}`, (data) => {
+      if (!data || data.status === "finished") {
+        document.getElementById("spectatorText").textContent = "Match ended. Finding next...";
+        setTimeout(findBestMatchToSpectate, 2000);
+      }
+    });
+  } else {
+    document.getElementById("spectatorText").textContent = "No suitable match. Waiting...";
+    setTimeout(findBestMatchToSpectate, 3000);
+  }
+}
+
+// ─── TV MODE (ELO TABLE) ───
+async function setTVMode(mode) {
+  document.getElementById("eloTable").style.display = "block";
+  if (!fbReady) return;
+  const data = await dbGet("players");
+  if (!data) return;
+  let list = Object.values(data).filter(p => p.name);
+  
+  if (mode === "best") {
+    list.sort((a, b) => (b.elo || 1500) - (a.elo || 1500));
+  } else if (mode === "random") {
+    list.sort(() => Math.random() - 0.5);
+  } else if (mode === "target" && onlineAccount) {
+    list.sort((a, b) => 
+      Math.abs((a.elo || 1500) - (onlineAccount.elo || 1500)) - 
+      Math.abs((b.elo || 1500) - (onlineAccount.elo || 1500))
+    );
+  }
+  
+  const eloList = document.getElementById("eloList");
+  eloList.innerHTML = list.slice(0, 10).map((p, i) => 
+    `<div>${i+1}. ${p.name} (${p.elo || 1500})</div>`
+  ).join('');
+}
+
+function resumePlay() {
+  document.getElementById("eloTable").style.display = "none";
+}
+
+// ═══════════════════════════════════════════════
+//  GAME LOOP
+// ═══════════════════════════════════════════════
+function gameLoop() {
+  if (!running) {
+    if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
+    return;
+  }
+  updateGame();
+  renderGame();
+  gameLoopId = requestAnimationFrame(gameLoop);
+}
+
+function updateGame() {
+  // Update balls
+  for (const ball of balls) {
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+    if (ball.x < ball.r || ball.x > W() - ball.r) ball.vx *= -1;
+    if (ball.y < ball.r || ball.y > H() - ball.r) ball.vy *= -1;
+  }
+  
+  // Update players
+  for (const player of players) {
+    if (!player.alive) continue;
+    
+    // Human player movement
+    if (player.isHuman) {
+      let dx = 0, dy = 0;
+      if (player.controls) {
+        if (keys[player.controls.left]) dx = -1;
+        if (keys[player.controls.right]) dx = 1;
+        if (keys[player.controls.up]) dy = -1;
+        if (keys[player.controls.down]) dy = 1;
+      } else {
+        if (keys['ArrowLeft'] || keys['a']) dx = -1;
+        if (keys['ArrowRight'] || keys['d']) dx = 1;
+        if (keys['ArrowUp'] || keys['w']) dy = -1;
+        if (keys['ArrowDown'] || keys['s']) dy = 1;
+      }
+      
+      if (dx !== 0 && dy !== 0) {
+        dx *= 0.707;
+        dy *= 0.707;
+      }
+      
+      player.x += dx * player.speed;
+      player.y += dy * player.speed;
+      player.x = Math.max(player.r, Math.min(W() - player.r, player.x));
+      player.y = Math.max(player.r, Math.min(H() - player.r, player.y));
+    }
+    
+    // AI Bot movement
+    if (player.isBot && player.alive) {
+      let nearestBall = null;
+      let nearestDist = Infinity;
+      for (const ball of balls) {
+        const dx = player.x - ball.x;
+        const dy = player.y - ball.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestBall = ball;
+        }
+      }
+      
+      if (nearestBall && nearestDist < 200) {
+        const dx = player.x - nearestBall.x;
+        const dy = player.y - nearestBall.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if (len > 0) {
+          player.x += (dx / len) * player.speed * 0.6;
+          player.y += (dy / len) * player.speed * 0.6;
+        }
+      } else {
+        if (Math.random() < 0.01) {
+          player.targetX = 50 + Math.random() * (W() - 100);
+          player.targetY = 50 + Math.random() * (H() - 100);
+        }
+        const dx = player.targetX - player.x;
+        const dy = player.targetY - player.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if (len > 5) {
+          player.x += (dx / len) * player.speed * 0.2;
+          player.y += (dy / len) * player.speed * 0.2;
+        }
+      }
+      
+      player.x = Math.max(player.r, Math.min(W() - player.r, player.x));
+      player.y = Math.max(player.r, Math.min(H() - player.r, player.y));
+    }
+  }
+  
+  // Collision detection
+  for (const player of players) {
+    if (!player.alive) continue;
+    for (const ball of balls) {
+      const dx = player.x - ball.x;
+      const dy = player.y - ball.y;
+      if (Math.sqrt(dx*dx + dy*dy) < player.r + ball.r) {
+        player.alive = false;
+        checkGameOver();
+        return;
+      }
+    }
+  }
+  
+  document.getElementById("balls").textContent = balls.length;
+}
+
+function renderGame() {
+  ctx.clearRect(0, 0, W(), H());
+  
+  // Background
+  const grad = ctx.createRadialGradient(W()/2, H()/2, 0, W()/2, H()/2, W()/2);
+  grad.addColorStop(0, "#1a1a2e");
+  grad.addColorStop(1, "#0a0a0a");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W(), H());
+  
+  // Draw coins (Coin Hunt mode)
+  for (const coin of coins) {
+    if (coin.collected) continue;
+    ctx.shadowColor = "#ffd700";
+    ctx.shadowBlur = 20;
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, coin.r, 0, Math.PI * 2);
+    ctx.fillStyle = coin.color;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#ffaa00";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  
+  // Draw balls with glow
+  for (const ball of balls) {
+    ctx.shadowColor = ball.color;
+    ctx.shadowBlur = 25;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+    ctx.fillStyle = ball.color;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  
+  // Draw players
+  for (const player of players) {
+    if (!player.alive) continue;
+    ctx.shadowColor = player.color;
+    ctx.shadowBlur = 20;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+    ctx.fillStyle = player.color;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Player name
+    ctx.fillStyle = "white";
+    ctx.font = "14px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(player.name, player.x, player.y - player.r - 10);
+  }
+}
+
+function checkGameOver() {
+  const alive = players.filter(p => p.alive);
+  if (alive.length <= 1) {
+    running = false;
+    const winner = alive.length === 1 ? alive[0] : null;
+    
+    // Check if online match
+    if (mode === "online" || players.some(p => p.isOnline)) {
+      setTimeout(() => showOnlineWinner(winner), 500);
+    } else {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      document.getElementById("finalTime").textContent = elapsed;
+      document.getElementById("gameOver").style.display = "flex";
+      document.getElementById("homeBtn").style.display = "none";
+      
+      if (mode === "ai") {
+        document.getElementById("ranking").innerHTML = players
+          .sort((a, b) => (a.alive ? 1 : 0) - (b.alive ? 1 : 0))
+          .map(p => `<div>${p.alive ? '✅' : '❌'} ${p.name} ${p.alive ? '(Survived)' : '(Eliminated)'}</div>`)
+          .join('');
+      }
+      
+      clearAllTimers();
+    }
+  }
+}
+
+function showOnlineWinner(winner) {
+  document.getElementById("winnerOverlay").style.display = "flex";
+  if (winner) {
+    document.getElementById("winnerText").textContent = "🏆 " + winner.name + " Wins!";
+    
+    if (winner.isHuman && onlineAccount) {
+      const eloChange = onlineVsBot ? 5 : 15;
+      onlineAccount.elo = (onlineAccount.elo || 1500) + eloChange;
+      onlineAccount.wins = (onlineAccount.wins || 0) + 1;
+      saveAccountLocal();
+      pushAccountToFirebase();
+      document.getElementById("winnerEloChange").textContent = "ELO +" + eloChange + " (" + onlineAccount.elo + ")";
+    } else if (onlineAccount) {
+      const eloChange = onlineVsBot ? 3 : 10;
+      onlineAccount.elo = Math.max(100, (onlineAccount.elo || 1500) - eloChange);
+      onlineAccount.losses = (onlineAccount.losses || 0) + 1;
+      saveAccountLocal();
+      pushAccountToFirebase();
+      document.getElementById("winnerEloChange").textContent = "ELO -" + eloChange + " (" + onlineAccount.elo + ")";
+    }
+  }
+  
+  document.getElementById("winnerButtons").innerHTML = `
+    <button onclick="closeWinner()">Play Again</button>
+    <button onclick="backToMenu()">🏠 Menu</button>
+  `;
+  updatePlayerStatus("Idle in Menu");
+}
+
+function closeWinner() {
+  document.getElementById("winnerOverlay").style.display = "none";
+  if (onlineAccount) {
+    showOnlineFlow();
+  } else {
+    backToMenu();
+  }
+}
+
+function restartGame() {
+  document.getElementById("gameOver").style.display = "none";
+  document.getElementById("ranking").innerHTML = "";
+  document.getElementById("matchBanner").style.display = "none";
+  startGame(mode);
+}
+
+// ═══════════════════════════════════════════════
+//  KEYBOARD CONTROLS
+// ═══════════════════════════════════════════════
+document.addEventListener("keydown", e => {
+  keys[e.key] = true;
+  if (e.key === "Escape") confirmHome();
+});
+
+document.addEventListener("keyup", e => {
+  keys[e.key] = false;
+});
+
+// ═══════════════════════════════════════════════
+//  MOUSE/TOUCH CONTROLS
+// ═══════════════════════════════════════════════
+canvas.addEventListener("mousemove", (e) => {
+  const pos = screenToVirtual(e.clientX, e.clientY);
+  for (const player of players) {
+    if (player.isHuman && player.alive) {
+      player.x = Math.max(player.r, Math.min(W() - player.r, pos.x));
+      player.y = Math.max(player.r, Math.min(H() - player.r, pos.y));
+    }
+  }
+});
+
+canvas.addEventListener("touchmove", (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  if (!touch) return;
+  const pos = screenToVirtual(touch.clientX, touch.clientY);
+  for (const player of players) {
+    if (player.isHuman && player.alive) {
+      player.x = Math.max(player.r, Math.min(W() - player.r, pos.x));
+      player.y = Math.max(player.r, Math.min(H() - player.r, pos.y));
+    }
+  }
+}, { passive: false });
+
+// ═══════════════════════════════════════════════
+//  START
+// ═══════════════════════════════════════════════
+document.getElementById("menu").style.display = "flex";
+document.getElementById("ui").style.display = "none";
+
+console.log("🎮 DarkOnBalls - Complete Version");
+console.log("All modes: Singleplayer, Multiplayer, AI Spectate, Tournament, Coin Hunt, Online 1v1, Online TV");
+console.log("🔥 Firebase integration active");
+console.log("👾 Enjoy the game!");
+</script>
+</body>
+</html>
